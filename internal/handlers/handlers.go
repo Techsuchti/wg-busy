@@ -12,6 +12,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yix/wg-busy/internal/gateway"
+
 	"github.com/yix/wg-busy/internal/auth"
 	"github.com/yix/wg-busy/internal/config"
 	"github.com/yix/wg-busy/internal/models"
@@ -57,6 +59,7 @@ type handler struct {
 	store    *config.Store
 	stats    *wgstats.Collector
 	zt       *zerotier.Supervisor
+	gateway  *gateway.Manager
 	sessions *auth.SessionManager
 	webauthn *auth.WebAuthnService
 }
@@ -263,7 +266,7 @@ func (h *handler) requireAuth(next http.Handler) http.Handler {
 }
 
 // NewRouter creates the HTTP mux with all routes registered.
-func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *zerotier.Supervisor, version string) http.Handler {
+func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *zerotier.Supervisor, gatewayManager *gateway.Manager, version string) http.Handler {
 	challenges := auth.NewChallengeStore()
 	sessions := auth.NewSessionManager()
 	webauthn := auth.NewWebAuthnService(challenges)
@@ -272,6 +275,7 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 		store:    store,
 		stats:    stats,
 		zt:       zt,
+		gateway:  gatewayManager,
 		sessions: sessions,
 		webauthn: webauthn,
 	}
@@ -323,6 +327,14 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 	mux.HandleFunc("POST /bgp/peers", h.CreateBGPPeer)
 	mux.HandleFunc("PUT /bgp/peers/{id}", h.UpdateBGPPeer)
 	mux.HandleFunc("DELETE /bgp/peers/{id}", h.DeleteBGPPeer)
+
+	// VPN gateway endpoints.
+	mux.HandleFunc("GET /gateways", h.GetGatewaysTab)
+	mux.HandleFunc("GET /gateways/new", h.GetGatewayForm)
+	mux.HandleFunc("POST /gateways", h.CreateGateway)
+	mux.HandleFunc("DELETE /gateways/{id}", h.DeleteGateway)
+	mux.HandleFunc("PUT /gateways/{id}/toggle", h.ToggleGateway)
+	mux.HandleFunc("GET /gateways/{id}/status", h.GetGatewayStatus)
 
 	// ZeroTier fragment endpoints.
 	mux.HandleFunc("GET /zerotier", h.GetZeroTierTab)

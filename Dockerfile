@@ -1,6 +1,6 @@
 FROM alpine:3.20
 
-LABEL org.opencontainers.image.source="https://github.com/yix/wg-busy"
+LABEL org.opencontainers.image.source="https://github.com/Techsuchti/wg-busy"
 
 # Alpine dropped the zerotier-one package after 3.17, so the musl-built binary
 # comes from the multi-arch zyclonite image. libc6-compat/libstdc++ are its

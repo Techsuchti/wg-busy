@@ -49,7 +49,7 @@ type Store struct {
 	// onChange is notified after a successful write. It must not block: it runs
 	// while the write lock is held, so anything slow (process control, HTTP)
 	// belongs on the receiver's own goroutine.
-	onChange func(*models.AppConfig)
+	onChanges []func(*models.AppConfig)
 
 	// ztGateways reports the ZeroTier subnets policy routes may use as gateways.
 	// Called while the store lock is held, so it must only read cached state.
@@ -116,7 +116,9 @@ func cloneAdvertisedRoutes(routes map[string][]string) map[string][]string {
 func (s *Store) OnChange(fn func(*models.AppConfig)) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.onChange = fn
+	if fn != nil {
+		s.onChanges = append(s.onChanges, fn)
+	}
 }
 
 // Load reads the YAML config file, or initializes defaults if it doesn't exist.
@@ -386,8 +388,11 @@ func (s *Store) Write(fn func(cfg *models.AppConfig) error) error {
 	}
 
 	// After persistence, so a failure here can never trigger the rollback above.
-	if s.onChange != nil {
-		s.onChange(&s.config)
+	// Callbacks must be non-blocking because Write still holds the store lock.
+	for _, fn := range s.onChanges {
+		if fn != nil {
+			fn(&s.config)
+		}
 	}
 
 	if len(applyErrs) > 0 {

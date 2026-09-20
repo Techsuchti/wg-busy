@@ -215,6 +215,22 @@
             </label>
 
             <label>
+                VPN-Gateway
+                <select name="vpnGatewayID">
+                    <option value="">Kein VPN-Gateway (direkter WG-Betrieb)</option>
+                    {{#each VPNGateways}}
+                    <option value="{{ID}}" {{#if (eq ID @root.Peer.VPNGatewayID)}}selected{{/if}}>
+                        {{Name}} ({{Interface}})
+                    </option>
+                    {{/each}}
+                </select>
+                <small>
+                    Der gesamte Traffic dieses Peers kann später über das ausgewählte WireGuard-Uplink-Gateway
+                    geroutet werden. Das Gateway wird zentral unter dem Tab „Gateways“ verwaltet.
+                </small>
+            </label>
+
+            <label>
                 Allowed Client IPs
                 <input type="text" name="clientAllowedIPs" value="{{#if Peer.ClientAllowedIPs}}{{Peer.ClientAllowedIPs}}{{else}}0.0.0.0/0, ::/0{{/if}}"
                        placeholder="0.0.0.0/0, ::/0">

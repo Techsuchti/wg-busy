@@ -49,6 +49,7 @@ type peerFormData struct {
 	Defaults  bool
 	Peer      models.Peer
 	ExitNodes []models.Peer
+	VPNGateways []models.VPNGateway
 	// Gateways are the subnets a policy route gateway may point into, shown as a
 	// hint on the form: the WireGuard subnet and any joined ZeroTier networks.
 	Gateways         []models.GatewayNet
@@ -143,6 +144,7 @@ func (h *handler) GetPeerForm(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		data.ExitNodes = models.ExitNodePeers(cfg.Peers)
+		data.VPNGateways = append([]models.VPNGateway(nil), cfg.VPNGateways...)
 		data.Gateways = models.GatewayNets(cfg.Server.Address, h.ztGatewayNets())
 	})
 
@@ -214,6 +216,7 @@ func (h *handler) CreatePeer(w http.ResponseWriter, r *http.Request) {
 		AdvertisedRoutes:    advertisedRoutes,
 		PolicyRoutes:        policyRoutes,
 		StrictPolicyRouting: r.FormValue("strictPolicyRouting") == "on",
+		VPNGatewayID:        strings.TrimSpace(r.FormValue("vpnGatewayID")),
 		Enabled:             r.FormValue("enabled") == "on",
 		CreatedAt:           now,
 		UpdatedAt:           now,
@@ -315,6 +318,7 @@ func (h *handler) UpdatePeer(w http.ResponseWriter, r *http.Request) {
 		p.AdvertisedRoutes = advertisedRoutes
 		p.PolicyRoutes = policyRoutes
 		p.StrictPolicyRouting = r.FormValue("strictPolicyRouting") == "on"
+		p.VPNGatewayID = strings.TrimSpace(r.FormValue("vpnGatewayID"))
 		p.Enabled = r.FormValue("enabled") == "on"
 		p.UpdatedAt = time.Now().UTC()
 
@@ -510,6 +514,7 @@ func (h *handler) RegeneratePeerKeys(w http.ResponseWriter, r *http.Request) {
 			data.Peer = *p
 		}
 		data.ExitNodes = models.ExitNodePeers(cfg.Peers)
+		data.VPNGateways = append([]models.VPNGateway(nil), cfg.VPNGateways...)
 		data.Gateways = models.GatewayNets(cfg.Server.Address, h.ztGatewayNets())
 	})
 	writePageJSON(w, http.StatusOK, "peer-form", data, warning)

@@ -14,6 +14,7 @@ import (
 
 	"github.com/yix/wg-busy/internal/bgp"
 	"github.com/yix/wg-busy/internal/config"
+	"github.com/yix/wg-busy/internal/gateway"
 	"github.com/yix/wg-busy/internal/handlers"
 	"github.com/yix/wg-busy/internal/models"
 	"github.com/yix/wg-busy/internal/wgstats"
@@ -84,7 +85,12 @@ func main() {
 	// ZeroTier runs as a supervised child process. Configure only records the
 	// desired state; the supervisor's goroutine does the starting and joining.
 	zt := zerotier.New(*ztDataPath)
+	gatewayManager := gateway.NewManager("/etc/wireguard")
 	store.OnChange(zt.Configure)
+	store.OnChange(func(cfg *models.AppConfig) {
+		snapshot := cfg.Clone()
+		go gatewayManager.Reconcile(snapshot)
+	})
 	// Policy routes may use a ZeroTier peer IP as their gateway, so wg0.conf
 	// rendering needs to know which subnets are on-link over which zt device.
 	store.SetZeroTierGateways(zt.GatewayNets)
@@ -108,7 +114,10 @@ func main() {
 			log.Printf("applying BGP after ZeroTier change: %v", err)
 		}
 	})
-	store.Read(func(cfg *models.AppConfig) { zt.Configure(cfg) })
+	store.Read(func(cfg *models.AppConfig) {
+		zt.Configure(cfg)
+		gatewayManager.Reconcile(*cfg)
+	})
 	zt.Start()
 
 	// Start stats collector with persisted base traffic counters.
@@ -145,6 +154,12 @@ func main() {
 		log.Printf("received %s, shutting down", sig)
 		stopPersister()
 		zt.Stop()
+		// Stop imported VPN gateways before terminating the process.
+		store.Read(func(cfg *models.AppConfig) {
+			for _, g := range cfg.VPNGateways {
+				_ = gatewayManager.Stop(g)
+			}
+		})
 		os.Exit(0)
 	}()
 
@@ -160,7 +175,7 @@ func main() {
 		log.Fatalf("embedded filesystem: %v", err)
 	}
 
-	mux := handlers.NewRouter(store, webContent, stats, zt, version)
+	mux := handlers.NewRouter(store, webContent, stats, zt, gatewayManager, version)
 
 	log.Printf("wg-busy %s listening on %s", version, *listen)
 	if err := http.ListenAndServe(*listen, mux); err != nil {
