@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -166,7 +167,11 @@ func ParseConfig(raw string) (models.VPNGateway, error) {
 
 func modelsValidKey(s string) bool {
 	s = strings.TrimSpace(s)
-	return len(s) == 44
+	if len(s) != 44 {
+		return false
+	}
+	_, err := base64.StdEncoding.DecodeString(s)
+	return err == nil
 }
 
 func modelsValidCIDRs(s string) bool {
