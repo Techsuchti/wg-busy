@@ -32,16 +32,7 @@ jobs:
         with:
           fetch-depth: '0'
 
-      # Generate new tag version
-      - name: Generate new tag version
-        id: tag_version
-        uses: anothrNick/github-tag-action@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          DRY_RUN: ${{ github.event_name == 'pull_request' }}
-          VERBOSE: true
-          DEFAULT_BUMP: patch
-          WITH_V: true
+      # Docker images are published only from explicit semver Git tags.
 
       # Set up QEMU for multi-platform support (arm64, etc.)
       - name: Set up QEMU
@@ -77,8 +68,10 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ github.event.repository.name }}
             ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
-            type=raw,value=${{ steps.tag_version.outputs.new_tag }}
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       # Set up Go and cross-compile binaries for all target architectures
       - name: Set up Go
@@ -90,6 +83,12 @@ jobs:
 
       - name: Build Go binaries (amd64 + arm64)
         run: make build
+
+      - name: Reject unversioned pushes
+        if: github.event_name != 'pull_request' && !startsWith(github.ref, 'refs/tags/v')
+        run: |
+          echo "Only version tags vX.Y.Z may publish Docker images."
+          exit 1
 
       # Build and push the image
       - name: Build and push
