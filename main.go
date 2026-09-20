@@ -154,6 +154,12 @@ func main() {
 		log.Printf("received %s, shutting down", sig)
 		stopPersister()
 		zt.Stop()
+		// Stop imported VPN gateways before terminating the process.
+		store.Read(func(cfg *models.AppConfig) {
+			for _, g := range cfg.VPNGateways {
+				_ = gatewayManager.Stop(g)
+			}
+		})
 		os.Exit(0)
 	}()
 
