@@ -61,6 +61,7 @@ type systemPageData struct {
 	Gateways      []systemGatewayView
 	IPRules       string
 	Routes        string
+	AuditLog      string
 }
 
 var systemPageTmpl = template.Must(template.New("system").Funcs(template.FuncMap{"ifClass": ifClass}).Parse(`
@@ -163,6 +164,11 @@ var systemPageTmpl = template.Must(template.New("system").Funcs(template.FuncMap
 			<summary><strong>VPN-Gateway Routing Tables</strong></summary>
 			<pre class="diagnostic-output">{{Routes}}</pre>
 		</details>
+	</section>
+
+	<section class="config-section">
+		<h3>Audit-Log</h3>
+		<pre class="diagnostic-output">{{AuditLog}}</pre>
 	</section>
 
 	<section class="config-section">
@@ -332,6 +338,19 @@ func (h *handler) GetSystemTab(w http.ResponseWriter, r *http.Request) {
 		}
 	})
 	data.Routes = strings.Join(routeLines, "\n\n")
+
+	// Show only the latest audit entries; request bodies and secrets are never logged.
+	auditPath := strings.TrimSuffix(h.store.ConfigPath(), "config.yaml") + "audit.log"
+	if auditRaw, err := os.ReadFile(auditPath); err == nil {
+		lines := strings.Split(strings.TrimSpace(string(auditRaw)), "\n")
+		if len(lines) > 50 {
+			lines = lines[len(lines)-50:]
+		}
+		data.AuditLog = strings.Join(lines, "\n")
+	}
+	if data.AuditLog == "" {
+		data.AuditLog = "Noch keine Änderungen protokolliert."
+	}
 	if data.Routes == "" {
 		data.Routes = "Keine VPN-Gateway-Routingtabellen gefunden."
 	}
