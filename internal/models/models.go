@@ -25,10 +25,11 @@ type Passkey struct {
 
 // AppConfig is the top-level structure persisted to YAML.
 type AppConfig struct {
-	Server   ServerConfig   `yaml:"server"`
-	Peers    []Peer         `yaml:"peers"`
-	BGPPeers []BGPPeer      `yaml:"bgpPeers,omitempty"`
-	ZeroTier ZeroTierConfig `yaml:"zerotier,omitempty"`
+	Server     ServerConfig   `yaml:"server"`
+	Peers      []Peer         `yaml:"peers"`
+	BGPPeers   []BGPPeer      `yaml:"bgpPeers,omitempty"`
+	ZeroTier   ZeroTierConfig `yaml:"zerotier,omitempty"`
+	VPNGateways []VPNGateway  `yaml:"vpnGateways,omitempty"`
 }
 
 // Clone returns an independent copy suitable for rollback and reconciliation.
@@ -47,7 +48,41 @@ func (c AppConfig) Clone() AppConfig {
 		clone.BGPPeers[i].ExportFilters = append([]RouteFilter(nil), c.BGPPeers[i].ExportFilters...)
 	}
 	clone.ZeroTier.Networks = append([]ZeroTierNetwork(nil), c.ZeroTier.Networks...)
+	clone.VPNGateways = append([]VPNGateway(nil), c.VPNGateways...)
 	return clone
+}
+
+// VPNGateway is an imported WireGuard client configuration used as an outbound
+// gateway for selected wg-busy peers. Hooks are intentionally not stored or
+// executed; imported configs are normalized to safe WireGuard primitives.
+type VPNGateway struct {
+	ID                   string    `yaml:"id"`
+	Name                 string    `yaml:"name"`
+	Interface            string    `yaml:"interface"`
+	PrivateKey           string    `yaml:"privateKey"`
+	Address              string    `yaml:"address"`
+	MTU                  uint16    `yaml:"mtu,omitempty"`
+	DNS                  string    `yaml:"dns,omitempty"`
+	PublicKey            string    `yaml:"publicKey"`
+	PresharedKey         string    `yaml:"presharedKey,omitempty"`
+	AllowedIPs           string    `yaml:"allowedIPs"`
+	Endpoint             string    `yaml:"endpoint"`
+	PersistentKeepalive  uint16    `yaml:"persistentKeepalive,omitempty"`
+	Enabled              bool      `yaml:"enabled"`
+	AutoStart            bool      `yaml:"autoStart"`
+	RoutingTableID       uint      `yaml:"routingTableID"`
+	CreatedAt            time.Time `yaml:"createdAt"`
+	UpdatedAt            time.Time `yaml:"updatedAt"`
+}
+
+// FindVPNGatewayByID returns a gateway by ID.
+func FindVPNGatewayByID(gateways []VPNGateway, id string) *VPNGateway {
+	for i := range gateways {
+		if gateways[i].ID == id {
+			return &gateways[i]
+		}
+	}
+	return nil
 }
 
 // ZeroTierConfig is the desired state of the local ZeroTier client.
@@ -223,6 +258,7 @@ type Peer struct {
 	StrictPolicyRouting  bool     `yaml:"strictPolicyRouting,omitempty"`
 	RoutingTableID       uint     `yaml:"routingTableID,omitempty"`
 	PolicyRoutingTableID uint     `yaml:"policyRoutingTableID,omitempty"`
+	VPNGatewayID         string   `yaml:"vpnGatewayID,omitempty"`
 	Enabled              bool     `yaml:"enabled"`
 
 	CreatedAt  time.Time `yaml:"createdAt"`
@@ -652,6 +688,57 @@ func ValidateConfig(cfg AppConfig) ValidationErrors {
 	errs = append(errs, ValidateExitNodeRefs(cfg.Peers)...)
 	for i := range cfg.BGPPeers {
 		errs = append(errs, cfg.BGPPeers[i].Validate()...)
+	}
+
+	gatewayIDs := make(map[string]string, len(cfg.VPNGateways))
+	gatewayIfaces := make(map[string]string, len(cfg.VPNGateways))
+	gatewayTables := make(map[uint]string, len(cfg.VPNGateways))
+	for _, g := range cfg.VPNGateways {
+		if strings.TrimSpace(g.ID) == "" {
+			errs = append(errs, ValidationError{Field: "vpnGateway.id", Message: "required"})
+		}
+		if strings.TrimSpace(g.Name) == "" {
+			errs = append(errs, ValidationError{Field: "vpnGateway.name", Message: "required"})
+		}
+		if previous, ok := gatewayIDs[g.ID]; ok {
+			errs = append(errs, ValidationError{Field: "vpnGateway.id", Message: fmt.Sprintf("gateway %q duplicates ID used by %q", g.Name, previous)})
+		} else if g.ID != "" {
+			gatewayIDs[g.ID] = g.Name
+		}
+		if previous, ok := gatewayIfaces[g.Interface]; ok && g.Interface != "" {
+			errs = append(errs, ValidationError{Field: "vpnGateway.interface", Message: fmt.Sprintf("gateway %q reuses interface %q used by %q", g.Name, g.Interface, previous)})
+		} else if g.Interface != "" {
+			gatewayIfaces[g.Interface] = g.Name
+		}
+		if previous, ok := gatewayTables[g.RoutingTableID]; ok && g.RoutingTableID != 0 {
+			errs = append(errs, ValidationError{Field: "vpnGateway.routingTableID", Message: fmt.Sprintf("gateway %q reuses routing table %d used by %q", g.Name, g.RoutingTableID, previous)})
+		} else if g.RoutingTableID != 0 {
+			gatewayTables[g.RoutingTableID] = g.Name
+		}
+		if g.PrivateKey != "" && !isValidBase64Key(g.PrivateKey) {
+			errs = append(errs, ValidationError{Field: "vpnGateway.privateKey", Message: fmt.Sprintf("gateway %q has an invalid private key", g.Name)})
+		}
+		if g.Address != "" && !isValidCIDRList(g.Address) {
+			errs = append(errs, ValidationError{Field: "vpnGateway.address", Message: fmt.Sprintf("gateway %q has an invalid address", g.Name)})
+		}
+		if g.PublicKey != "" && !isValidBase64Key(g.PublicKey) {
+			errs = append(errs, ValidationError{Field: "vpnGateway.publicKey", Message: fmt.Sprintf("gateway %q has an invalid public key", g.Name)})
+		}
+		if g.PresharedKey != "" && !isValidBase64Key(g.PresharedKey) {
+			errs = append(errs, ValidationError{Field: "vpnGateway.presharedKey", Message: fmt.Sprintf("gateway %q has an invalid preshared key", g.Name)})
+		}
+		if g.AllowedIPs != "" && !isValidCIDRList(g.AllowedIPs) {
+			errs = append(errs, ValidationError{Field: "vpnGateway.allowedIPs", Message: fmt.Sprintf("gateway %q has invalid AllowedIPs", g.Name)})
+		}
+		if g.Endpoint != "" && !isValidEndpoint(g.Endpoint) {
+			errs = append(errs, ValidationError{Field: "vpnGateway.endpoint", Message: fmt.Sprintf("gateway %q has an invalid endpoint", g.Name)})
+		}
+	}
+
+	for _, p := range cfg.Peers {
+		if p.VPNGatewayID != "" && FindVPNGatewayByID(cfg.VPNGateways, p.VPNGatewayID) == nil {
+			errs = append(errs, ValidationError{Field: "vpnGatewayID", Message: fmt.Sprintf("peer %q references missing VPN gateway %q", p.Name, p.VPNGatewayID)})
+		}
 	}
 
 	peerIDs := make(map[string]string, len(cfg.Peers))
