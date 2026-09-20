@@ -307,6 +307,29 @@ func (m *Manager) Status(id string) Status {
 func (m *Manager) Reconcile(cfg models.AppConfig) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	// Reserve deterministic routing-table IDs for imported uplinks. The IDs are
+	// intentionally outside the range used by wg-busy's exit-node tables.
+	usedTables := make(map[uint]bool)
+	for _, g := range cfg.VPNGateways {
+		if g.RoutingTableID > 0 {
+			usedTables[g.RoutingTableID] = true
+		}
+	}
+
+	nextTable := uint(tableBase)
+	for i := range cfg.VPNGateways {
+		if cfg.VPNGateways[i].RoutingTableID != 0 {
+			continue
+		}
+		for usedTables[nextTable] {
+			nextTable++
+		}
+		cfg.VPNGateways[i].RoutingTableID = nextTable
+		usedTables[nextTable] = true
+		nextTable++
+	}
+
 	desired := make(map[string]models.VPNGateway, len(cfg.VPNGateways))
 	for _, g := range cfg.VPNGateways {
 		desired[g.ID] = g
