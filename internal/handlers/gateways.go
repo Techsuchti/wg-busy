@@ -169,11 +169,9 @@ func (h *handler) DeleteGateway(w http.ResponseWriter, r *http.Request) {
 					copyValue := cfg.VPNGateways[i]
 					old = &copyValue
 				}
-				if strings.TrimSpace(cfg.VPNGateways[i].ID) != "" {
-					for _, p := range cfg.Peers {
-						if p.VPNGatewayID == id {
-							p.VPNGatewayID = ""
-						}
+				for peerIndex := range cfg.Peers {
+					if cfg.Peers[peerIndex].VPNGatewayID == id {
+						cfg.Peers[peerIndex].VPNGatewayID = ""
 					}
 				}
 				cfg.VPNGateways = append(cfg.VPNGateways[:i], cfg.VPNGateways[i+1:]...)
