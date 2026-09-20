@@ -87,6 +87,10 @@ func main() {
 	zt := zerotier.New(*ztDataPath)
 	gatewayManager := gateway.NewManager("/etc/wireguard")
 	store.OnChange(zt.Configure)
+	store.OnChange(func(cfg *models.AppConfig) {
+		snapshot := cfg.Clone()
+		go gatewayManager.Reconcile(snapshot)
+	})
 	// Policy routes may use a ZeroTier peer IP as their gateway, so wg0.conf
 	// rendering needs to know which subnets are on-link over which zt device.
 	store.SetZeroTierGateways(zt.GatewayNets)
