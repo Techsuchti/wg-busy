@@ -377,6 +377,11 @@ func (m *Manager) Reconcile(cfg models.AppConfig) {
 			m.status[g.ID] = Status{ID:g.ID, Name:g.Name, Interface:g.Interface, Enabled:true, Running:false, LastError:strings.TrimSpace(string(out)), Endpoint:g.Endpoint, LastChange:time.Now().UTC()}
 			continue
 		}
+		if err := ensurePolicyRoutes(g); err != nil {
+			_, _ = command("wg-quick", "down", path)
+			m.status[g.ID] = Status{ID:g.ID, Name:g.Name, Interface:g.Interface, Enabled:true, Running:false, LastError:err.Error(), Endpoint:g.Endpoint, LastChange:time.Now().UTC()}
+			continue
+		}
 		m.status[g.ID] = Status{ID:g.ID, Name:g.Name, Interface:g.Interface, Enabled:true, Running:true, Endpoint:g.Endpoint, LastChange:time.Now().UTC()}
 	}
 }
