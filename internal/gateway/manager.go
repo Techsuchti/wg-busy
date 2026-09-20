@@ -12,8 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.zx2c4.com/wireguard/wgctrl"
-
 	"github.com/yix/wg-busy/internal/models"
 )
 
@@ -329,22 +327,37 @@ func (m *Manager) Status(id string) Status {
 
 	// Read-only WireGuard telemetry is used for the dashboard and diagnostics.
 	// Never expose private or preshared keys through Status.
-	client, err := wgctrl.New()
-	if err != nil {
-		return s
-	}
-	defer client.Close()
-	device, err := client.Device(s.Interface)
-	if err != nil {
-		return s
-	}
-	s.PeerCount = len(device.Peers)
-	for _, peer := range device.Peers {
-		if peer.LastHandshakeTime.After(s.LatestHandshake) {
-			s.LatestHandshake = peer.LastHandshakeTime
+	latest, latestErr := command("wg", "show", s.Interface, "latest-handshakes")
+	transfers, transferErr := command("wg", "show", s.Interface, "transfer")
+	if latestErr == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(latest)), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) != 2 {
+				continue
+			}
+			sec, err := strconv.ParseInt(fields[1], 10, 64)
+			if err == nil && sec > 0 {
+				ts := time.Unix(sec, 0)
+				if ts.After(s.LatestHandshake) {
+					s.LatestHandshake = ts
+				}
+			}
 		}
-		s.ReceiveBytes += peer.ReceiveBytes
-		s.TransmitBytes += peer.TransmitBytes
+	}
+	if transferErr == nil {
+		for _, line := range strings.Split(strings.TrimSpace(string(transfers)), "\n") {
+			fields := strings.Fields(line)
+			if len(fields) != 3 {
+				continue
+			}
+			rx, rxErr := strconv.ParseInt(fields[1], 10, 64)
+			tx, txErr := strconv.ParseInt(fields[2], 10, 64)
+			if rxErr == nil && txErr == nil {
+				s.ReceiveBytes += rx
+				s.TransmitBytes += tx
+				s.PeerCount++
+			}
+		}
 	}
 	return s
 }
