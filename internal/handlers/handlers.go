@@ -301,6 +301,8 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 	mux.HandleFunc("DELETE /api/auth/passkeys/{id}", h.DeletePasskey)
 
 	// Peer fragment endpoints.
+	mux.HandleFunc("GET /peers/quick", h.GetQuickPeerForm)
+	mux.HandleFunc("POST /peers/quick", h.CreateQuickPeer)
 	mux.HandleFunc("GET /peers", h.ListPeers)
 	mux.HandleFunc("GET /peers/new", h.GetPeerForm)
 	mux.HandleFunc("GET /peers/{id}/edit", h.GetPeerForm)
@@ -329,6 +331,8 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 	mux.HandleFunc("DELETE /bgp/peers/{id}", h.DeleteBGPPeer)
 
 	// VPN gateway endpoints.
+	mux.HandleFunc("GET /gateway-assignments", h.GetGatewayAssignments)
+	mux.HandleFunc("PUT /gateway-assignments/{id}", h.AssignPeerGateway)
 	mux.HandleFunc("GET /gateways", h.GetGatewaysTab)
 	mux.HandleFunc("GET /gateways/new", h.GetGatewayForm)
 	mux.HandleFunc("POST /gateways", h.CreateGateway)
