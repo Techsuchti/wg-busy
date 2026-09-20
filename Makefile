@@ -1,6 +1,6 @@
 APP_NAME := wg-busy
 BUILD_DIR := bin
-VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+VERSION := $(shell tr -d '[:space:]' < VERSION 2>/dev/null || echo "dev")
 LDFLAGS := -ldflags "-s -w -X main.version=$(VERSION)"
 
 .PHONY: all build build-amd64 build-arm64 dev clean test lint fmt tidy docker-build docker-run help
@@ -37,7 +37,7 @@ clean: ## Remove build artifacts
 	rm -rf $(BUILD_DIR)
 
 docker-build: ## Build Docker image
-	docker build -t $(APP_NAME):$(VERSION) -t $(APP_NAME):latest .
+	docker build -t $(APP_NAME):$(VERSION) .
 
 docker-run: build docker-build ## Build and run in Docker with WireGuard capabilities
 	docker run --rm -it \
@@ -50,7 +50,7 @@ docker-run: build docker-build ## Build and run in Docker with WireGuard capabil
 		-p 51820:51820/udp \
 		-p 9993:9993/udp \
 		-v $(PWD)/data:/app/data \
-		$(APP_NAME):latest
+		$(APP_NAME):$(VERSION)
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | \
