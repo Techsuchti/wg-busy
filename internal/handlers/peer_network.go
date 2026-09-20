@@ -35,7 +35,11 @@ func (h *handler) buildPeerNetworkDevicesData(peerID string, devices []models.Pe
 		data.Rules = make(map[string]string)
 		for _, rule := range p.DeviceRoutingRules {
 			if rule.Enabled {
-				data.Rules[rule.DeviceIP] = rule.GatewayID
+				if strings.TrimSpace(rule.GatewayID) == "" {
+					data.Rules[rule.DeviceIP] = "__direct__"
+				} else {
+					data.Rules[rule.DeviceIP] = rule.GatewayID
+				}
 			}
 		}
 	})
@@ -63,7 +67,7 @@ func (h *handler) GetPeerNetworkDevices(w http.ResponseWriter, r *http.Request) 
 	writePageJSON(w, http.StatusOK, "peer-network-devices", data, nil)
 }
 
-// ScanPeerNetworkDevices scans only the networks advertised by this peer.
+// ScanPeerNetworkDevices scans the peer networks, with an optional explicit CIDR override.
 func (h *handler) ScanPeerNetworkDevices(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	var peer models.Peer
@@ -79,7 +83,7 @@ func (h *handler) ScanPeerNetworkDevices(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	devices, err := netdiscover.ScanPeer(peer)
+	devices, err := netdiscover.ScanPeer(peer, r.FormValue("network"))
 	if err != nil {
 		data, _ := h.buildPeerNetworkDevicesData(id, nil, err.Error())
 		writePageJSON(w, http.StatusOK, "peer-network-devices", data, nil)
@@ -154,14 +158,15 @@ func (h *handler) UpdatePeerDeviceRoute(w http.ResponseWriter, r *http.Request) 
 			}
 			found = true
 			if gatewayID == "" {
-				p.DeviceRoutingRules = append(p.DeviceRoutingRules[:i], p.DeviceRoutingRules[i+1:]...)
+				p.DeviceRoutingRules[i].GatewayID = ""
+				p.DeviceRoutingRules[i].Enabled = true
 			} else {
 				p.DeviceRoutingRules[i].GatewayID = gatewayID
 				p.DeviceRoutingRules[i].Enabled = true
 			}
 			break
 		}
-		if !found && gatewayID != "" {
+		if !found {
 			p.DeviceRoutingRules = append(p.DeviceRoutingRules, models.PeerDeviceRoutingRule{
 				DeviceIP: deviceIP,
 				GatewayID: gatewayID,
