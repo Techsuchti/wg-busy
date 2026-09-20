@@ -222,7 +222,7 @@
                 <select name="vpnGatewayID">
                     <option value="">Kein VPN-Gateway (direkter WG-Betrieb)</option>
                     {{#each VPNGateways}}
-                    <option value="{{ID}}" {{#if (eq ID @root.Peer.VPNGatewayID)}}selected{{/if}}>
+                    <option value="{{ID}}" {{#if Selected}}selected{{/if}}>
                         {{Name}} ({{Interface}})
                     </option>
                     {{/each}}
