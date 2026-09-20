@@ -229,6 +229,31 @@ func command(name string, args ...string) ([]byte, error) {
 	return exec.Command(name, args...).CombinedOutput()
 }
 
+func ensurePolicyRoutes(g models.VPNGateway) error {
+	if g.Interface == "" || g.RoutingTableID == 0 {
+		return nil
+	}
+
+	for _, allowed := range strings.Split(g.AllowedIPs, ",") {
+		allowed = strings.TrimSpace(allowed)
+		_, network, err := net.ParseCIDR(allowed)
+		if err != nil {
+			continue
+		}
+		if network.String() == "0.0.0.0/0" {
+			if out, err := command("ip", "route", "replace", "default", "dev", g.Interface, "table", strconv.FormatUint(uint64(g.RoutingTableID), 10)); err != nil {
+				return fmt.Errorf("installing IPv4 gateway route for %s: %s: %w", g.Name, strings.TrimSpace(string(out)), err)
+			}
+		}
+		if network.String() == "::/0" {
+			if out, err := command("ip", "-6", "route", "replace", "default", "dev", g.Interface, "table", strconv.FormatUint(uint64(g.RoutingTableID), 10)); err != nil {
+				return fmt.Errorf("installing IPv6 gateway route for %s: %s: %w", g.Name, strings.TrimSpace(string(out)), err)
+			}
+		}
+	}
+	return nil
+}
+
 func (m *Manager) Start(g models.VPNGateway) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -255,6 +280,11 @@ func (m *Manager) Start(g models.VPNGateway) error {
 	out, err := command("wg-quick", "up", path)
 	if err != nil {
 		return fmt.Errorf("starting gateway %s: %s: %w", g.Name, strings.TrimSpace(string(out)), err)
+	}
+	if err := ensurePolicyRoutes(g); err != nil {
+		_, _ = command("wg-quick", "down", path)
+		m.status[g.ID] = Status{ID: g.ID, Name: g.Name, Interface: iface, Enabled: true, Running: false, LastError: err.Error(), Endpoint: g.Endpoint, LastChange: time.Now().UTC()}
+		return err
 	}
 	m.status[g.ID] = Status{ID: g.ID, Name: g.Name, Interface: iface, Enabled: true, Running: true, Endpoint: g.Endpoint, LastChange: time.Now().UTC()}
 	return nil
