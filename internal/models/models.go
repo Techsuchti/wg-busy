@@ -85,6 +85,39 @@ func FindVPNGatewayByID(gateways []VPNGateway, id string) *VPNGateway {
 	return nil
 }
 
+// ValidateVPNGateway verifies the normalized fields of an imported upstream
+// WireGuard client configuration.
+func (g *VPNGateway) ValidateVPNGateway() error {
+	if strings.TrimSpace(g.ID) == "" {
+		return errors.New("gateway ID is required")
+	}
+	if strings.TrimSpace(g.Name) == "" {
+		return errors.New("gateway name is required")
+	}
+	if strings.TrimSpace(g.Interface) == "" {
+		return errors.New("gateway interface is required")
+	}
+	if !isValidBase64Key(g.PrivateKey) {
+		return errors.New("gateway private key is invalid")
+	}
+	if !isValidCIDRList(g.Address) {
+		return errors.New("gateway address is invalid")
+	}
+	if !isValidBase64Key(g.PublicKey) {
+		return errors.New("gateway public key is invalid")
+	}
+	if !isValidCIDRList(g.AllowedIPs) {
+		return errors.New("gateway AllowedIPs are invalid")
+	}
+	if !isValidEndpoint(g.Endpoint) {
+		return errors.New("gateway endpoint is invalid")
+	}
+	if g.MTU != 0 && g.MTU < 1280 {
+		return errors.New("gateway MTU must be at least 1280")
+	}
+	return nil
+}
+
 // ZeroTierConfig is the desired state of the local ZeroTier client.
 type ZeroTierConfig struct {
 	Enabled                               bool              `yaml:"enabled,omitempty"`
