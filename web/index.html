@@ -61,6 +61,10 @@
                 onclick="selectTab(this)">
                 ZeroTier
             </button>
+            <button id="tab-gateways" role="tab" data-stats-kind="peers" hx-get="gateways" hx-target="#tab-content" hx-swap="innerHTML"
+                onclick="selectTab(this)">
+                VPN Gateways
+            </button>
         </div>
 
         <div id="tab-content" hx-get="peers" hx-trigger="templates-ready from:body" hx-swap="innerHTML">
