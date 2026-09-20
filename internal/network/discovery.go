@@ -26,11 +26,15 @@ const (
 func ScanPeer(peer models.Peer, explicitCIDR string) ([]models.PeerNetworkDevice, error) {
 	var rawNetworks []string
 	if strings.TrimSpace(explicitCIDR) != "" {
-		rawNetworks = strings.FieldsFunc(explicitCIDR, func(r rune) bool { return r == ',' || r == ';' || r == '\n' || r == '\r' || r == ' ' || r == '\t' })
+		rawNetworks = strings.FieldsFunc(explicitCIDR, func(r rune) bool {
+			return r == ',' || r == ';' || r == '\n' || r == '\r' || r == ' ' || r == '\t'
+		})
 	} else {
 		rawNetworks = append(rawNetworks, peer.AdvertisedRoutes...)
-		if len(rawNetworks) == 0 {
-			rawNetworks = append(rawNetworks, peer.AllowedIPs...)
+		if len(rawNetworks) == 0 && strings.TrimSpace(peer.AllowedIPs) != "" {
+			rawNetworks = strings.FieldsFunc(peer.AllowedIPs, func(r rune) bool {
+				return r == ',' || r == ';' || r == '\n' || r == '\r' || r == ' ' || r == '\t'
+			})
 		}
 	}
 
