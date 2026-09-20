@@ -10,6 +10,7 @@ import (
 
 	"github.com/yix/wg-busy/internal/gateway"
 	"github.com/yix/wg-busy/internal/models"
+	"github.com/yix/wg-busy/internal/config"
 )
 
 type gatewayView struct {
