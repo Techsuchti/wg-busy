@@ -53,6 +53,16 @@ func (h *handler) buildPeerNetworkDevicesData(peerID string, devices []models.Pe
 	} else {
 		data.Devices = append([]models.PeerNetworkDevice(nil), data.Peer.NetworkDevices...)
 	}
+	// If the peer has a gateway, that gateway is the default for every
+	// discovered device. An explicit device rule can override it with either
+	// another gateway or an explicit direct rule.
+	if strings.TrimSpace(data.Peer.VPNGatewayID) != "" {
+		for _, device := range data.Devices {
+			if _, exists := data.Rules[device.IP]; !exists {
+				data.Rules[device.IP] = data.Peer.VPNGatewayID
+			}
+		}
+	}
 	data.Error = errMsg
 	return data, nil
 }
