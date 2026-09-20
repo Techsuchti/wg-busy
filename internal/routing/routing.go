@@ -406,6 +406,73 @@ const (
 	gatewayNatChainV4         = "WG_BUSY_GW_NAT4"
 )
 
+// localNetworkCIDRs are destinations that must stay on the normal LAN path
+// instead of being sent through a selected VPN gateway. WG_BUSY_LAN_CIDRS can
+// override the default with a comma-separated list of CIDRs.
+func localNetworkCIDRs() []string {
+	value := strings.TrimSpace(os.Getenv("WG_BUSY_LAN_CIDRS"))
+	if value == "" {
+		return []string{"192.168.178.0/24"}
+	}
+	var result []string
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, _, err := net.ParseCIDR(item); err == nil {
+			result = append(result, item)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"192.168.178.0/24"}
+	}
+	return result
+}
+
+const localNetworkRulePriorityBase = 17000
+
+type localNetworkRule struct {
+	IPCommand string
+	Source    string
+	Dest      string
+	Priority  int
+}
+
+func localNetworkRules(cfg models.AppConfig) []localNetworkRule {
+	var rules []localNetworkRule
+	priority := localNetworkRulePriorityBase
+	for _, p := range cfg.Peers {
+		if !p.Enabled {
+			continue
+		}
+		for _, source := range models.PeerSources(p.AllowedIPs) {
+			_, srcNet, srcErr := net.ParseCIDR(source)
+			if srcErr != nil {
+				continue
+			}
+			for _, dest := range localNetworkCIDRs() {
+				_, dstNet, dstErr := net.ParseCIDR(dest)
+				if dstErr != nil || (srcNet.IP.To4() == nil) != (dstNet.IP.To4() == nil) {
+					continue
+				}
+				cmd := "ip"
+				if dstNet.IP.To4() == nil {
+					cmd = "ip -6"
+				}
+				rules = append(rules, localNetworkRule{
+					IPCommand: cmd,
+					Source: source,
+					Dest: dest,
+					Priority: priority,
+				})
+				priority++
+			}
+		}
+	}
+	return rules
+}
+
 // vpnGatewayRule describes source-based policy routing for a peer assigned
 // directly to an imported WireGuard gateway. A trailing prohibit rule makes the
 // assignment fail closed if the gateway table has no usable route.
