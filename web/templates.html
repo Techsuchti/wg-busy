@@ -376,14 +376,17 @@
     <div class="flex-row" style="justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
         <div>
             <strong>Geräte hinter diesem Peer</strong>
-            <div><small class="text-muted">Der Scan verwendet ausschließlich die unter „Angekündigte Routen“ eingetragenen Netze.</small></div>
+            <div><small class="text-muted">Die Netze werden automatisch aus „Angekündigte Routen“ bzw. den Peer-AllowedIPs ermittelt. Bei Bedarf kannst du ein eigenes CIDR vorgeben.</small></div>
         </div>
-        <button type="button" class="btn btn-outline secondary"
+        <div class="flex-row" style="gap:.5rem;flex-wrap:wrap;">
+            <input type="text" name="network" placeholder="z. B. 192.168.178.0/24" style="min-width:220px;">
+            <button type="button" class="btn btn-outline secondary"
                 hx-post="peers/{{Peer.ID}}/network-scan"
                 hx-target="#peer-network-devices"
-                hx-swap="innerHTML">
-            🔍 Netzwerk scannen
-        </button>
+                hx-swap="innerHTML" hx-include="closest div">
+                🔍 Netzwerk scannen
+            </button>
+        </div>
     </div>
 
     {{#if Error}}
@@ -393,7 +396,7 @@
     {{#unless Devices}}
     <article style="padding:.75rem;">
         <p style="margin-bottom:.35rem;">Noch keine Geräte erkannt.</p>
-        <small class="text-muted">Für die Erkennung muss der Peer ein erreichbares LAN unter „Angekündigte Routen“ veröffentlichen.</small>
+        <small class="text-muted">Wenn kein Netz automatisch gefunden wird, kannst du oben ein LAN-CIDR angeben. Geräte werden nur erkannt, wenn sie über den Peer erreichbar sind.</small>
     </article>
     {{else}}
     <div style="overflow-x:auto;">
@@ -421,7 +424,7 @@
                                 hx-trigger="change"
                                 hx-target="#peer-network-devices"
                                 hx-swap="innerHTML">
-                            <option value="" {{#if (eq (lookup @root.Rules IP) "")}}selected{{/if}}>Direkt</option>
+                            <option value="" {{#if (eq (lookup @root.Rules IP) "__direct__")}}selected{{/if}}>Direkt</option>
                             {{#each @root.Gateways}}
                             <option value="{{ID}}" {{#if (eq ID (lookup @root.Rules ../IP))}}selected{{/if}}>
                                 {{Name}} ({{Interface}})
