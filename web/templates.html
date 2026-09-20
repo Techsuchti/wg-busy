@@ -347,6 +347,19 @@
                 </label>
             </div>
 
+            {{#unless IsNew}}
+            <section class="peer-network-section" style="margin-top:1rem;">
+                <h3>Netzwerkgeräte &amp; Routing</h3>
+                <div id="peer-network-devices"
+                     hx-get="peers/{{Peer.ID}}/network-devices"
+                     hx-trigger="load"
+                     hx-target="#peer-network-devices"
+                     hx-swap="innerHTML">
+                    <p class="text-muted">Netzwerkgeräte werden geladen…</p>
+                </div>
+            </section>
+            {{/unless}}
+
             <footer>
                 <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary">{{#if IsNew}}Create Peer{{else}}Save Changes{{/if}}</button>
@@ -356,6 +369,81 @@
 </dialog>
 </script>
 
+
+
+<script type="text/x-handlebars-template" id="peer-network-devices-template">
+<div>
+    <div class="flex-row" style="justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
+        <div>
+            <strong>Geräte hinter diesem Peer</strong>
+            <div><small class="text-muted">Der Scan verwendet ausschließlich die unter „Advertised Routes“ eingetragenen Netze.</small></div>
+        </div>
+        <button type="button" class="btn btn-outline secondary"
+                hx-post="peers/{{Peer.ID}}/network-scan"
+                hx-target="#peer-network-devices"
+                hx-swap="innerHTML">
+            🔍 Netzwerk scannen
+        </button>
+    </div>
+
+    {{#if Error}}
+    <div class="toast toast-error" role="alert">{{Error}}</div>
+    {{/if}}
+
+    {{#unless Devices}}
+    <article style="padding:.75rem;">
+        <p style="margin-bottom:.35rem;">Noch keine Geräte erkannt.</p>
+        <small class="text-muted">Für die Erkennung muss der Peer ein erreichbares LAN unter „Advertised Routes“ veröffentlichen.</small>
+    </article>
+    {{else}}
+    <div style="overflow-x:auto;">
+        <table style="width:100%;">
+            <thead>
+                <tr>
+                    <th>Gerät</th>
+                    <th>IP</th>
+                    <th>MAC</th>
+                    <th>Routing</th>
+                </tr>
+            </thead>
+            <tbody>
+            {{#each Devices}}
+                <tr>
+                    <td>
+                        <strong>{{#if Hostname}}{{Hostname}}{{else}}Unbekanntes Gerät{{/if}}</strong>
+                        {{#if Online}}<span class="badge badge-ok">Online</span>{{else}}<span class="badge">Offline</span>{{/if}}
+                    </td>
+                    <td><code>{{IP}}</code></td>
+                    <td><code>{{#if MAC}}{{MAC}}{{else}}—{{/if}}</code></td>
+                    <td>
+                        <select name="gatewayID"
+                                hx-put="peers/{{@root.Peer.ID}}/device-routes/{{IP}}"
+                                hx-trigger="change"
+                                hx-target="#peer-network-devices"
+                                hx-swap="innerHTML">
+                            <option value="" {{#if (eq (lookup @root.Rules IP) "")}}selected{{/if}}>Direkt</option>
+                            {{#each @root.Gateways}}
+                            <option value="{{ID}}" {{#if (eq ID (lookup @root.Rules ../IP))}}selected{{/if}}>
+                                {{Name}} ({{Interface}})
+                            </option>
+                            {{/each}}
+                        </select>
+                    </td>
+                </tr>
+            {{/each}}
+            </tbody>
+        </table>
+    </div>
+    {{/unless}}
+
+    <small class="text-muted" style="display:block;margin-top:.65rem;">
+        <strong>So funktioniert es:</strong> Ist beim Peer ein VPN-Gateway gesetzt, läuft standardmäßig
+        der gesamte Internetverkehr darüber. Eine hier auf „Direkt“ gesetzte Geräte-Regel überschreibt
+        diese Vorgabe. Bleibt beim Peer kein Gateway gesetzt, können einzelne Geräte gezielt einem
+        VPN-Gateway zugewiesen werden.
+    </small>
+</div>
+</script>
 
 <script type="text/x-handlebars-template" id="quick-peer-form-template">
 <dialog open>
