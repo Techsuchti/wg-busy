@@ -104,6 +104,44 @@ func (s *Store) advertisedRoutes() map[string][]string {
 	return cloneAdvertisedRoutes(s.bgpAdvertised())
 }
 
+const vpnGatewayRoutingTableBase uint = 20000
+
+// ensureVPNGatewayRoutingTableIDs assigns stable, non-conflicting policy-routing
+// table IDs to imported VPN gateways. GatewayManager also derives missing IDs
+// defensively, but the Store is the source of truth and must persist them.
+func ensureVPNGatewayRoutingTableIDs(cfg *models.AppConfig) bool {
+	used := make(map[uint]bool)
+	for _, p := range cfg.Peers {
+		if p.RoutingTableID > 0 {
+			used[p.RoutingTableID] = true
+		}
+		if p.PolicyRoutingTableID > 0 {
+			used[p.PolicyRoutingTableID] = true
+		}
+	}
+	for _, g := range cfg.VPNGateways {
+		if g.RoutingTableID > 0 {
+			used[g.RoutingTableID] = true
+		}
+	}
+
+	next := vpnGatewayRoutingTableBase
+	changed := false
+	for i := range cfg.VPNGateways {
+		if cfg.VPNGateways[i].RoutingTableID != 0 {
+			continue
+		}
+		for used[next] {
+			next++
+		}
+		cfg.VPNGateways[i].RoutingTableID = next
+		used[next] = true
+		changed = true
+		next++
+	}
+	return changed
+}
+
 func cloneAdvertisedRoutes(routes map[string][]string) map[string][]string {
 	clone := make(map[string][]string, len(routes))
 	for peer, prefixes := range routes {
@@ -152,6 +190,11 @@ func Load(configPath, wgConfigPath string) (*Store, error) {
 	if err := yaml.Unmarshal(data, &s.config); err != nil {
 		return nil, fmt.Errorf("parsing config: %w", err)
 	}
+	if ensureVPNGatewayRoutingTableIDs(&s.config) {
+		if err := s.saveYAML(); err != nil {
+			return nil, fmt.Errorf("persisting VPN gateway routing tables: %w", err)
+		}
+	}
 	s.routingState = s.config.Clone()
 	s.wgRestartPending = true
 
@@ -188,6 +231,7 @@ func (s *Store) IsPeerRoutingApplied(peerID string) bool {
 		desired.ExitNodeID == applied.ExitNodeID &&
 		desired.RoutingTableID == applied.RoutingTableID &&
 		desired.PolicyRoutingTableID == applied.PolicyRoutingTableID &&
+		desired.VPNGatewayID == applied.VPNGatewayID &&
 		slices.Equal(desired.PolicyRoutes, applied.PolicyRoutes) &&
 		slices.Equal(desired.ExitNodeRoutes, applied.ExitNodeRoutes) &&
 		desired.AllowedIPs == applied.AllowedIPs
@@ -216,6 +260,7 @@ func (s *Store) PeerRoutingAppliedMap() map[string]bool {
 			desired.ExitNodeID == applied.ExitNodeID &&
 			desired.RoutingTableID == applied.RoutingTableID &&
 			desired.PolicyRoutingTableID == applied.PolicyRoutingTableID &&
+			desired.VPNGatewayID == applied.VPNGatewayID &&
 			slices.Equal(desired.PolicyRoutes, applied.PolicyRoutes) &&
 			slices.Equal(desired.ExitNodeRoutes, applied.ExitNodeRoutes) &&
 			desired.AllowedIPs == applied.AllowedIPs
@@ -328,6 +373,7 @@ func (s *Store) Write(fn func(cfg *models.AppConfig) error) error {
 		s.config = backup
 		return err
 	}
+	ensureVPNGatewayRoutingTableIDs(&s.config)
 	var restartErr error
 	if s.wgHasApplied {
 		restartErr = wireguard.ServerRestartReason(s.wgAppliedServer, s.config.Server)
