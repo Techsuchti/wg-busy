@@ -686,12 +686,12 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 				if strings.Contains(source, ":") {
 					cmds = append(cmds,
 						fmt.Sprintf("ip6tables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV6, source, g.Interface),
-						fmt.Sprintf("ip6tables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV6, source, models.WGDevice),
+						fmt.Sprintf("ip6tables -w -A %s -i %s -o %s -d %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV6, g.Interface, models.WGDevice, source),
 					)
 				} else {
 					cmds = append(cmds,
 						fmt.Sprintf("iptables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV4, source, g.Interface),
-						fmt.Sprintf("iptables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, source, models.WGDevice),
+						fmt.Sprintf("iptables -w -A %s -i %s -o %s -d %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, g.Interface, models.WGDevice, source),
 						fmt.Sprintf("iptables -t nat -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, source, g.Interface),
 					)
 				}
@@ -709,7 +709,7 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 				if ip == nil || ip.To4() == nil { continue }
 				cmds = append(cmds,
 					fmt.Sprintf("iptables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV4, ip.String(), g.Interface),
-					fmt.Sprintf("iptables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, ip.String(), models.WGDevice),
+					fmt.Sprintf("iptables -w -A %s -i %s -o %s -d %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, g.Interface, models.WGDevice, ip.String()),
 					fmt.Sprintf("iptables -t nat -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, ip.String(), g.Interface),
 				)
 			}
