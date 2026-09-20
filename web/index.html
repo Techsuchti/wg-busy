@@ -103,7 +103,7 @@
         }
         initTheme();
 
-        // Initial tab routing via query parameter (?tab=server|bgp|zerotier|gateways)
+        // Initial tab routing via query parameter (?tab=server|bgp|zerotier|gateways|assignments)
         var targetTab = urlParams.get('tab');
         if (targetTab) {
             var tabBtn = document.querySelector('.tabs button[data-stats-kind="' + targetTab + '"]');
