@@ -42,14 +42,19 @@ type peersListData struct {
 }
 
 // peerFormData is the template data for the peer create/edit form.
+type peerFormGateway struct {
+	models.VPNGateway
+	Selected bool
+}
+
 type peerFormData struct {
 	IsNew bool
 	// Defaults renders a blank form with default values checked. It is off when
 	// re-rendering after an error, so the user's own input is preserved.
-	Defaults  bool
-	Peer      models.Peer
-	ExitNodes []models.Peer
-	VPNGateways []models.VPNGateway
+	Defaults    bool
+	Peer        models.Peer
+	ExitNodes   []models.Peer
+	VPNGateways []peerFormGateway
 	// Gateways are the subnets a policy route gateway may point into, shown as a
 	// hint on the form: the WireGuard subnet and any joined ZeroTier networks.
 	Gateways         []models.GatewayNet
@@ -144,7 +149,12 @@ func (h *handler) GetPeerForm(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		data.ExitNodes = models.ExitNodePeers(cfg.Peers)
-		data.VPNGateways = append([]models.VPNGateway(nil), cfg.VPNGateways...)
+		for _, gateway := range cfg.VPNGateways {
+			data.VPNGateways = append(data.VPNGateways, peerFormGateway{
+				VPNGateway: gateway,
+				Selected:   gateway.ID == data.Peer.VPNGatewayID,
+			})
+		}
 		data.Gateways = models.GatewayNets(cfg.Server.Address, h.ztGatewayNets())
 	})
 
@@ -514,7 +524,12 @@ func (h *handler) RegeneratePeerKeys(w http.ResponseWriter, r *http.Request) {
 			data.Peer = *p
 		}
 		data.ExitNodes = models.ExitNodePeers(cfg.Peers)
-		data.VPNGateways = append([]models.VPNGateway(nil), cfg.VPNGateways...)
+		for _, gateway := range cfg.VPNGateways {
+			data.VPNGateways = append(data.VPNGateways, peerFormGateway{
+				VPNGateway: gateway,
+				Selected:   gateway.ID == data.Peer.VPNGatewayID,
+			})
+		}
 		data.Gateways = models.GatewayNets(cfg.Server.Address, h.ztGatewayNets())
 	})
 	writePageJSON(w, http.StatusOK, "peer-form", data, warning)
