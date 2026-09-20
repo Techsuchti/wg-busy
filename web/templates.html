@@ -13,14 +13,14 @@
 
 <script type="text/x-handlebars-template" id="route-filter-row-template">
 <div class="route-filter-row" style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-    <input type="text" name="{{NamePrefix}}Prefix[]" value="" placeholder="Prefix (e.g. 10.1.0.0/16)" style="flex:1">
+    <input type="text" name="{{NamePrefix}}Prefix[]" value="" placeholder="Präfix (z. B. 10.1.0.0/16)" style="flex:1">
     <select name="{{NamePrefix}}Matcher[]" style="width:auto">
-        <option value="exact">Exact</option>
-        <option value="orlonger">Or Longer</option>
+        <option value="exact">Exakt</option>
+        <option value="orlonger">Oder länger</option>
     </select>
     <select name="{{NamePrefix}}Action[]" style="width:auto">
-        <option value="accept">Accept</option>
-        <option value="reject">Reject</option>
+        <option value="accept">Annehmen</option>
+        <option value="reject">Ablehnen</option>
     </select>
     <button type="button" class="btn btn-outline-danger" style="width:auto" onclick="this.closest('.route-filter-row').remove()">X</button>
 </div>
@@ -39,7 +39,7 @@
 {{#if this}}
 <div class="toast toast-error" role="alert">
     <div>
-        <strong>Could not save &mdash; please fix:</strong>
+        <strong>Speichern nicht möglich &mdash; bitte korrigieren:</strong>
         <ul class="error-list">
             {{#each this}}<li><code>{{Field}}</code> {{Message}}</li>{{/each}}
         </ul>
@@ -82,7 +82,7 @@
         </div>
     </div>
     {{#unless Peers}}
-    <p>No peers configured. Add one to get started.</p>
+    <p>Noch keine Benutzer eingerichtet. Lege einen Benutzer an, um zu beginnen.</p>
     {{else}}
     {{#each Peers}}
     {{> peer-row this}}
@@ -92,12 +92,12 @@
 </script>
 
 <script type="text/x-handlebars-template" id="peer-row-template">
-<div class="peer-row {{#unless Peer.Enabled}}peer-disabled{{/unless}}" id="peer-{{Peer.ID}}">
+<div class="peer-row {{#unless Peer.Aktiviert}}peer-disabled{{/unless}}" id="peer-{{Peer.ID}}">
     <div class="peer-info">
         <strong>
             {{Peer.Name}}
-            {{#if Peer.IsExitNode}}<span class="badge badge-exit">Exit Node</span>{{/if}}
-            {{#if ExitNodeName}}<span class="badge badge-via">via {{ExitNodeName}}</span>{{/if}}
+            {{#if Peer.IsExitNode}}<span class="badge badge-exit">Exit-Node</span>{{/if}}
+            {{#if ExitNodeName}}<span class="badge badge-via">über {{ExitNodeName}}</span>{{/if}}
             {{#if Peer.StrictPolicyRouting}}
                 {{#if StrictApplied}}
                 <span class="badge badge-warn" title="Traffic may only use this peer's own routes">Strict</span>
@@ -106,30 +106,30 @@
                 {{/if}}
             {{/if}}
         </strong>
-        {{#if Endpoint}}<div style="font-size:0.8em;font-weight:normal;opacity:0.7;margin-top:0.1em">({{Endpoint}})</div>{{/if}}
+        {{#if Endpunkt}}<div style="font-size:0.8em;font-weight:normal;opacity:0.7;margin-top:0.1em">({{Endpunkt}})</div>{{/if}}
         <small id="peer-stats-{{Peer.ID}}" class="peer-stats">
            {{> peer-stats this}}
         </small>
     </div>
     <div class="peer-actions">
-        <button class="btn btn-outline secondary qr-btn" title="QR Code"
+        <button class="btn btn-outline secondary qr-btn" title="QR-Code"
                 hx-get="peers/{{Peer.ID}}/qr" hx-target="#modal-container" hx-swap="innerHTML">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 0h7v7H0V0zm1 1v5h5V1H1zm1 1h3v3H2V2zm8-2h7v7H10V0zm1 1v5h5V1h-5zm1 1h3v3h-3V2zM0 10h7v6H0v-6zm1 1v4h5v-4H1zm1 1h3v2H2v-2zm8-2h2v2h-2v-2zm3 0h3v2h-3v-2zm-3 3h2v3h-2v-3zm3 0h1v1h-1v-1zm2 0h1v1h-1v-1zm2 0h1v3h-1v-3zm-2 2h1v1h-1v-1z"/></svg>
         </button>
-        <a href="api/peers/{{Peer.ID}}/config" download role="button" class="btn btn-outline secondary">Download</a>
+        <a href="api/peers/{{Peer.ID}}/config" download role="button" class="btn btn-outline secondary">Herunterladen</a>
         <button class="btn btn-outline" hx-get="peers/{{Peer.ID}}/edit" hx-target="#modal-container" hx-swap="innerHTML">Edit</button>
         <button class="btn btn-outline secondary"
                 hx-put="peers/{{Peer.ID}}/toggle"
                 hx-target="#peer-{{Peer.ID}}"
                 hx-swap="outerHTML">
-            {{#if Peer.Enabled}}Disable{{else}}Enable{{/if}}
+            {{#if Peer.Aktiviert}}Deaktivieren{{else}}Aktivieren{{/if}}
         </button>
         <button class="btn btn-outline-danger"
                 hx-delete="peers/{{Peer.ID}}"
                 hx-target="#tab-content"
                 hx-swap="innerHTML"
-                hx-confirm="Delete peer {{Peer.Name}}?">
-            Delete
+                hx-confirm="Löschen peer {{Peer.Name}}?">
+            Löschen
         </button>
     </div>
 </div>
@@ -139,8 +139,8 @@
     <span class="peer-stats-text">
         {{AllowedIPs}}
         {{#if HasStats}} &middot; <span class="stats-rx">&darr;{{CurrentRxPS}} <small class="text-muted">({{TransferRx}})</small></span> <span class="stats-tx">&uarr;{{CurrentTxPS}} <small class="text-muted">({{TransferTx}})</small></span>{{/if}}
-        {{#unless HasStats}} &middot; Created {{formatTime CreatedAt}}{{/unless}}
-        &middot; last seen {{#if LastSeenAt}}<time datetime="{{LastSeenAt}}" title="{{LastSeenAt}}">{{LastSeen}}</time>{{else}}never{{/if}}
+        {{#unless HasStats}} &middot; Erstellt {{formatTime ErstelltAt}}{{/unless}}
+        &middot; zuletzt gesehen {{#if LastSeenAt}}<time datetime="{{LastSeenAt}}" title="{{LastSeenAt}}">{{LastSeen}}</time>{{else}}nie{{/if}}
     </span>
     {{#if HasStats}} <span class="peer-sparkline">{{{SparklineSVG}}}</span>{{/if}}
 </script>
@@ -149,16 +149,16 @@
 <dialog>
     <article>
         <header class="flex-row">
-            <p class="mb-0"><strong>QR Code &mdash; {{Name}}</strong></p>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
+            <p class="mb-0"><strong>QR-Code &mdash; {{Name}}</strong></p>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
         </header>
         <div style="text-align:center">
-            <img src="api/peers/{{ID}}/qr" alt="QR Code for {{Name}}" width="256" height="256"
+            <img src="api/peers/{{ID}}/qr" alt="QR-Code for {{Name}}" width="256" height="256"
                  style="image-rendering:pixelated; max-width: 100%; height: auto;">
-            <p><small>Scan with the WireGuard mobile app to import this peer configuration.</small></p>
+            <p><small>Mit der WireGuard-App auf dem Smartphone scannen, um diese Konfiguration zu importieren.</small></p>
         </div>
         <footer>
-            <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Schließen</button>
         </footer>
     </article>
 </dialog>
@@ -168,8 +168,8 @@
 <dialog>
     <article>
         <header class="flex-row">
-            <p class="mb-0"><strong>WireGuard Status &mdash; <code>wg show</code></strong></p>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
+            <p class="mb-0"><strong>WireGuard-Status &mdash; <code>wg show</code></strong></p>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
         </header>
         <div>
             {{#if Error}}
@@ -177,11 +177,11 @@
             {{else if Output}}
             <pre style="margin: 0; padding: 1rem; background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: var(--border-radius); overflow-x: auto; font-family: var(--font-mono); font-size: 0.88em; line-height: 1.45; white-space: pre-wrap; word-break: break-all;"><code>{{Output}}</code></pre>
             {{else}}
-            <p><small class="text-muted">No WireGuard status output.</small></p>
+            <p><small class="text-muted">Keine WireGuard-Statusausgabe.</small></p>
             {{/if}}
         </div>
         <footer>
-            <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+            <button type="button" class="btn btn-secondary" onclick="closeModal()">Schließen</button>
         </footer>
     </article>
 </dialog>
@@ -191,8 +191,8 @@
 <dialog>
     <article>
         <header class="flex-row">
-            <p class="mb-0"><strong>{{#if IsNew}}Add Peer{{else}}Edit Peer{{/if}}</strong></p>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
+            <p class="mb-0"><strong>{{#if IsNew}}Peer hinzufügen{{else}}Peer bearbeiten{{/if}}</strong></p>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
         </header>
         <form {{#if IsNew}}hx-post="peers"{{else}}hx-put="peers/{{Peer.ID}}"{{/if}}
               hx-target="#modal-container" hx-swap="innerHTML">
@@ -209,11 +209,11 @@
             </label>
 
             <label>
-                Client IP
+                Client-IP
                 <input type="text" name="allowedIPs" value="{{Peer.AllowedIPs}}"
                        placeholder="Auto-assign (leave empty)"
                        {{#if (hasField ValidationErrors "allowedIPs")}}aria-invalid="true"{{/if}}>
-                <small>Leave empty to auto-assign next available IP from server subnet.</small>
+                <small>Leer lassen, damit automatisch die nächste freie IP aus dem Servernetz vergeben wird.</small>
                 {{#each ValidationErrors}}{{#if (eq Field "allowedIPs")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
             </label>
 
@@ -234,27 +234,27 @@
             </label>
 
             <label>
-                Allowed Client IPs
+                Allowed Client-IPs
                 <input type="text" name="clientAllowedIPs" value="{{#if Peer.ClientAllowedIPs}}{{Peer.ClientAllowedIPs}}{{else}}0.0.0.0/0, ::/0{{/if}}"
                        placeholder="0.0.0.0/0, ::/0">
-                <small>Routes the client sends through the tunnel.</small>
+                <small>Netze, die der Client durch den Tunnel sendet.</small>
             </label>
 
             <label>
-                Advertised Routes
+                Angekündigte Routen
                 <textarea name="advertisedRoutes" rows="2"
                           placeholder="10.1.2.0/24">{{#each Peer.AdvertisedRoutes}}{{this}}
 {{/each}}</textarea>
-                <small>Networks behind this peer to route through the tunnel (one CIDR per line or comma-separated).</small>
+                <small>Netze hinter diesem Peer, die durch den Tunnel geroutet werden sollen (eine CIDR pro Zeile oder kommasepariert).</small>
                 {{#each ValidationErrors}}{{#if (eq Field "advertisedRoutes")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
             </label>
             
             <label>
-                Policy Routes
+                Policy-Routen
                 <textarea name="policyRoutes" rows="2"
-                          placeholder="10.5.5.0/24 via 10.0.0.1">{{#each Peer.PolicyRoutes}}{{this}}
+                          placeholder="10.5.5.0/24 über 10.0.0.1">{{#each Peer.PolicyRoutes}}{{this}}
 {{/each}}</textarea>
-                <small>Format: &lt;CIDR&gt; via &lt;Gateway IP&gt;, one per line. Traffic to these subnets from this peer will be routed via the gateway.</small>
+                <small>Format: &lt;CIDR&gt; über &lt;Gateway-IP&gt;, eine Route pro Zeile. Datenverkehr zu diesen Netzen wird über das angegebene Gateway geroutet.</small>
                 <small>
                     The gateway can be a WireGuard peer or a ZeroTier peer &mdash; the route follows whichever interface it is on-link for. Available:
                     {{#each Gateways}}{{#if @index}}, {{/if}}<code>{{CIDR}}</code> ({{Device}}){{else}}none configured{{/each}}
@@ -265,43 +265,43 @@
             <fieldset>
                 <label>
                     <input type="checkbox" name="strictPolicyRouting" {{#if Peer.StrictPolicyRouting}}checked{{/if}}>
-                    Strict policy routing
+                    Striktes Policy-Routing
                 </label>
                 <small>
-                    Traffic from this peer may only use the routes above. Anything they do not
+                    Datenverkehr dieses Peers darf nur die oben definierten Routen verwenden. Alles, was nicht
                     match is rejected instead of falling back to the server's main routing table,
-                    so nothing can leak out of the intended path.
+                    damit kein Datenverkehr über einen unerwünschten Pfad entweichen kann.
                 </small>
                 {{#each ValidationErrors}}{{#if (eq Field "strictPolicyRouting")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
             </fieldset>
 
             <label>
-                DNS (override)
+                DNS (Überschreiben)
                 <input type="text" name="dns" value="{{Peer.DNS}}"
-                       placeholder="Inherit from server">
+                       placeholder="Vom Server übernehmen">
             </label>
 
             <label>
-                Persistent Keepalive (seconds)
+                Persistent Keepalive (Sekunden)
                 <input type="number" name="persistentKeepalive"
                        value="{{#if Peer.PersistentKeepalive}}{{Peer.PersistentKeepalive}}{{else}}25{{/if}}"
                        min="0" max="65535">
             </label>
 
             <label>
-                Endpoint
-                <input type="text" name="endpoint" value="{{Peer.Endpoint}}"
-                       placeholder="Not usually needed for server-side peers">
+                Endpunkt
+                <input type="text" name="endpoint" value="{{Peer.Endpunkt}}"
+                       placeholder="Für serverseitige Peers normalerweise nicht erforderlich">
             </label>
 
             <fieldset>
                 <label>
                     <input type="checkbox" name="presharedKey" {{#if (or Defaults Peer.PresharedKey)}}checked{{/if}}>
-                    {{#if IsNew}}Generate preshared key{{else}}Has preshared key{{/if}}
+                    {{#if IsNew}}Preshared Key erzeugen{{else}}Preshared Key vorhanden{{/if}}
                 </label>
                 <label>
-                    <input type="checkbox" name="enabled" {{#if (or Defaults Peer.Enabled)}}checked{{/if}}>
-                    Enabled
+                    <input type="checkbox" name="enabled" {{#if (or Defaults Peer.Aktiviert)}}checked{{/if}}>
+                    Aktiviert
                 </label>
             </fieldset>
 
@@ -309,27 +309,27 @@
                 <label>
                     <input type="checkbox" name="isExitNode" {{#if Peer.IsExitNode}}checked{{/if}}
                            onchange="toggleExitNodeFields(this)">
-                    Exit Node
+                    Exit-Node
                 </label>
             </fieldset>
 
             <div id="exit-node-config" {{#unless Peer.IsExitNode}}style="display:none"{{/unless}} class="exit-node-field">
                 <fieldset>
-                    <legend>Exit Node Configuration</legend>
+                    <legend>Exit-Node Configuration</legend>
                     <label>
                         <input type="checkbox" name="exitNodeAllowAll"
                                {{#if (or Defaults Peer.ExitNodeAllowAll)}}checked{{/if}}
                                onchange="toggleExitNodeRoutes(this)">
-                        Route all traffic via this node (0.0.0.0/0)
+                        Gesamten Datenverkehr über diesen Knoten routen (0.0.0.0/0)
                     </label>
 
                     <div id="exit-node-routes-field" {{#if (or Defaults Peer.ExitNodeAllowAll)}}style="display:none"{{/if}}>
                         <label>
-                            Specific Routes (CIDRs)
+                            Bestimmte Routen (CIDRs)
                             <textarea name="exitNodeRoutes" rows="3" 
                                       placeholder="10.0.0.0/24">{{#each Peer.ExitNodeRoutes}}{{this}}
 {{/each}}</textarea>
-                            <small>One CIDR per line. Leave empty to route nothing (if check disabled).</small>
+                            <small>Eine CIDR pro Zeile. Leer lassen, um nichts zu routen (wenn deaktiviert).</small>
                         </label>
                     </div>
                 </fieldset>
@@ -337,9 +337,9 @@
 
             <div id="route-via-field" {{#if Peer.IsExitNode}}style="display:none"{{/if}}>
                 <label>
-                    Route via (exit node)
+                    Über Exit-Node routen
                     <select name="exitNodeID">
-                        <option value="">None</option>
+                        <option value="">Keine</option>
                         {{#each ExitNodes}}
                         <option value="{{ID}}" {{#if (eq ID @root.Peer.ExitNodeID)}}selected{{/if}}>{{Name}} ({{AllowedIPs}})</option>
                         {{/each}}
@@ -361,8 +361,8 @@
             {{/unless}}
 
             <footer>
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">{{#if IsNew}}Create Peer{{else}}Save Changes{{/if}}</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">{{#if IsNew}}Peer erstellen{{else}}Änderungen speichern{{/if}}</button>
             </footer>
         </form>
     </article>
@@ -376,7 +376,7 @@
     <div class="flex-row" style="justify-content:space-between; gap:.75rem; margin-bottom:.75rem;">
         <div>
             <strong>Geräte hinter diesem Peer</strong>
-            <div><small class="text-muted">Der Scan verwendet ausschließlich die unter „Advertised Routes“ eingetragenen Netze.</small></div>
+            <div><small class="text-muted">Der Scan verwendet ausschließlich die unter „Angekündigte Routen“ eingetragenen Netze.</small></div>
         </div>
         <button type="button" class="btn btn-outline secondary"
                 hx-post="peers/{{Peer.ID}}/network-scan"
@@ -393,7 +393,7 @@
     {{#unless Devices}}
     <article style="padding:.75rem;">
         <p style="margin-bottom:.35rem;">Noch keine Geräte erkannt.</p>
-        <small class="text-muted">Für die Erkennung muss der Peer ein erreichbares LAN unter „Advertised Routes“ veröffentlichen.</small>
+        <small class="text-muted">Für die Erkennung muss der Peer ein erreichbares LAN unter „Angekündigte Routen“ veröffentlichen.</small>
     </article>
     {{else}}
     <div style="overflow-x:auto;">
@@ -453,7 +453,7 @@
                 <p class="mb-0"><strong>Schnell einen Benutzer anlegen</strong></p>
                 <small class="text-muted">Nur Spitzname eingeben – Schlüssel, IP, PSK und Client-Routen werden automatisch erstellt.</small>
             </div>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding:.2rem .6rem;min-height:32px" onclick="closeModal()">✕</button>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding:.2rem .6rem;min-height:32px" onclick="closeModal()">✕</button>
         </header>
         {{#if Error}}<div class="toast toast-error" role="alert">{{Error}}</div>{{/if}}
         <form hx-post="peers/quick" hx-target="#modal-container" hx-swap="innerHTML">
@@ -484,7 +484,7 @@
                 <p class="mb-0"><strong>Benutzer erstellt</strong></p>
                 <small class="text-muted">{{Peer.Peer.Name}} ist bereit.</small>
             </div>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding:.2rem .6rem;min-height:32px" onclick="closeModal()">✕</button>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding:.2rem .6rem;min-height:32px" onclick="closeModal()">✕</button>
         </header>
         <div class="toast toast-success">IP: <code>{{Peer.Peer.AllowedIPs}}</code></div>
         <div class="quick-peer-actions">
@@ -522,7 +522,7 @@
         <article class="assignment-row" data-assignment-name="{{Name}}">
             <div class="assignment-user">
                 <strong>{{Name}}</strong>
-                <small><code>{{AllowedIPs}}</code> · {{#if Enabled}}aktiv{{else}}deaktiviert{{/if}}</small>
+                <small><code>{{AllowedIPs}}</code> · {{#if Aktiviert}}aktiv{{else}}deaktiviert{{/if}}</small>
             </div>
             <form class="assignment-form" hx-put="gateway-assignments/{{ID}}" hx-target="#gateway-assignments" hx-swap="outerHTML">
                 <label>
@@ -549,7 +549,7 @@
     <div class="header-row">
         <h2>Server Configuration</h2>
         <div class="btn-group">
-            <a href="api/server/config" download role="button" class="btn btn-outline secondary">Download wg0.conf</a>
+            <a href="api/server/config" download role="button" class="btn btn-outline secondary">Herunterladen wg0.conf</a>
             <button class="btn btn-outline secondary" hx-get="server/show" hx-target="#modal-container" hx-swap="innerHTML">wg show</button>
             <button class="btn btn-primary" hx-post="api/server/apply" hx-target="#apply-result" hx-swap="innerHTML"
                     hx-confirm="Apply configuration? This will restart the WireGuard interface.">
@@ -568,7 +568,7 @@
 
         <div class="grid">
             <label>
-                Listen Port *
+                Listen-Port *
                 <input type="number" name="listenPort" value="{{Server.ListenPort}}"
                        required min="1" max="65535"
                        {{#if (hasField ValidationErrors "listenPort")}}aria-invalid="true"{{/if}}>
@@ -584,8 +584,8 @@
         </div>
 
         <label>
-            Public Endpoint
-            <input type="text" name="endpoint" value="{{Server.Endpoint}}"
+            Public Endpunkt
+            <input type="text" name="endpoint" value="{{Server.Endpunkt}}"
                    placeholder="vpn.example.com:51820">
             <small>Public address clients connect to. Used when generating client configs.</small>
         </label>
@@ -661,7 +661,7 @@
 
             <div class="header-row" style="margin-top: 1.25rem; margin-bottom: 0.75rem;">
                 <h4>Registered Passkeys ({{len Server.Passkeys}})</h4>
-                <button type="button" class="btn btn-outline secondary" style="width:auto" onclick="openAddPasskeyModal()">+ Add Passkey</button>
+                <button type="button" class="btn btn-outline secondary" style="width:auto" onclick="openAddPasskeyModal()">+ Passkey hinzufügen</button>
             </div>
 
             {{#unless Server.Passkeys}}
@@ -672,7 +672,7 @@
                 <thead>
                     <tr>
                         <th scope="col">Name</th>
-                        <th scope="col">Created</th>
+                        <th scope="col">Erstellt</th>
                         <th scope="col">Last Used</th>
                         <th scope="col" style="text-align: right;">Action</th>
                     </tr>
@@ -684,12 +684,12 @@
                             <strong>{{#if Name}}{{Name}}{{else}}{{name}}{{/if}}</strong>
                             <div style="font-size: 0.78em; opacity: 0.7; font-family: var(--font-mono); word-break: break-all;">ID: {{#if ID}}{{ID}}{{else}}{{id}}{{/if}}</div>
                         </td>
-                        <td><small>{{#if CreatedAt}}{{formatTime CreatedAt}}{{else}}{{formatTime createdAt}}{{/if}}</small></td>
+                        <td><small>{{#if ErstelltAt}}{{formatTime ErstelltAt}}{{else}}{{formatTime createdAt}}{{/if}}</small></td>
                         <td><small>{{#if LastUsedAt}}{{formatTime LastUsedAt}}{{else if lastUsedAt}}{{formatTime lastUsedAt}}{{else}}<span class="text-muted">Never</span>{{/if}}</small></td>
                         <td style="text-align: right;">
                             <button type="button" class="btn btn-outline-danger" style="width:auto; padding: 0.25rem 0.6rem; font-size: 0.85em;"
                                     onclick="deletePasskey('{{#if ID}}{{ID}}{{else}}{{id}}{{/if}}', '{{#if Name}}{{Name}}{{else}}{{name}}{{/if}}')">
-                                Delete
+                                Löschen
                             </button>
                         </td>
                     </tr>
@@ -729,14 +729,14 @@
             <fieldset>
                 <legend>ZeroTier Configuration</legend>
                 <label>
-                    <input type="checkbox" name="ztEnabled" {{#if Config.Enabled}}checked{{/if}}>
-                    Enable ZeroTier
+                    <input type="checkbox" name="ztAktiviert" {{#if Config.Aktiviert}}checked{{/if}}>
+                    Aktivieren ZeroTier
                 </label>
                 <label>
-                    <input type="checkbox" name="ztMasquerade" {{#unless Config.DisableMasquerade}}checked{{/unless}}>
+                    <input type="checkbox" name="ztMasquerade" {{#unless Config.DeaktivierenMasquerade}}checked{{/unless}}>
                     Masquerade WireGuard traffic over ZeroTier
                 </label>
-                <small>Disable this when the ZeroTier network already has a route back to the WireGuard subnet.</small>
+                <small>Deaktivieren this when the ZeroTier network already has a route back to the WireGuard subnet.</small>
                 <label>
                     <input type="checkbox" name="ztExcludeAdvertisedRoutesFromMasquerade" {{#if Config.ExcludeAdvertisedRoutesFromMasquerade}}checked{{/if}}>
                     Exclude advertised networks from masquerade
@@ -789,10 +789,10 @@
 </script>
 
 <script type="text/x-handlebars-template" id="zerotier-status-template">
-<div id="zerotier-status"{{#if Config.Enabled}} hx-get="zerotier/status?since={{Revision}}"
+<div id="zerotier-status"{{#if Config.Aktiviert}} hx-get="zerotier/status?since={{Revision}}"
      hx-trigger="load delay:100ms, zerotier-repoll from:body" hx-swap="outerHTML"{{/if}}>
-{{#unless Config.Enabled}}
-<article class="toast toast-error">ZeroTier is disabled. Enable it above to start the service.</article>
+{{#unless Config.Aktiviert}}
+<article class="toast toast-error">ZeroTier is disabled. Aktivieren it above to start the service.</article>
 {{else}}
     {{#if Snapshot.ServiceErr}}
     <div class="toast toast-error" role="alert">
@@ -968,7 +968,7 @@
 <div id="bgp-custom-peers-list" {{#if OOB}}hx-swap-oob="true"{{/if}}>
     <div class="header-row">
         <h3>Custom peers</h3>
-        <button class="btn btn-primary" style="width:auto" hx-get="bgp/peers/new" hx-target="#modal-container" hx-swap="innerHTML">+ Add Peer</button>
+        <button class="btn btn-primary" style="width:auto" hx-get="bgp/peers/new" hx-target="#modal-container" hx-swap="innerHTML">+ Peer hinzufügen</button>
     </div>
     {{#unless Peers}}
     <p><small class="text-muted">No custom BGP peers configured.</small></p>
@@ -976,12 +976,12 @@
     {{#each Peers}}
     <article class="flex-row" style="align-items:center;">
         <div>
-            <strong>{{Name}}</strong> {{#unless Enabled}}<span class="badge badge-warn">Disabled</span>{{/unless}}
+            <strong>{{Name}}</strong> {{#unless Aktiviert}}<span class="badge badge-warn">Deaktivierend</span>{{/unless}}
             <div><small class="text-muted">{{PeerIP}} (AS{{PeerASN}}) &middot; {{#if Connect}}active{{else}}passive{{/if}}{{#if RedistributeConnected}} &middot; local/connected routes{{/if}}{{#if MaxReceivedPrefixLength}} &middot; received max /{{MaxReceivedPrefixLength}}{{/if}}{{#if MaxAdvertisedPrefixLength}} &middot; advertised max /{{MaxAdvertisedPrefixLength}}{{/if}}{{#if RouteFilters}} &middot; {{len RouteFilters}} received filter(s){{/if}}{{#if ExportFilters}} &middot; {{len ExportFilters}} advertised filter(s){{/if}}</small></div>
         </div>
         <div class="btn-group">
             <button class="btn btn-outline" style="width:auto" hx-get="bgp/peers/{{ID}}/edit" hx-target="#modal-container" hx-swap="innerHTML">Edit</button>
-            <button class="btn btn-outline-danger" style="width:auto" hx-delete="bgp/peers/{{ID}}" hx-target="#tab-content" hx-swap="innerHTML" hx-confirm="Delete BGP peer {{Name}}?">Delete</button>
+            <button class="btn btn-outline-danger" style="width:auto" hx-delete="bgp/peers/{{ID}}" hx-target="#tab-content" hx-swap="innerHTML" hx-confirm="Löschen BGP peer {{Name}}?">Löschen</button>
         </div>
     </article>
     {{/each}}
@@ -994,7 +994,7 @@
     <article>
         <header class="flex-row">
             <p class="mb-0"><strong>{{#if IsNew}}Add BGP Peer{{else}}Edit BGP Peer{{/if}}</strong></p>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
         </header>
         <form {{#if IsNew}}hx-post="bgp/peers"{{else}}hx-put="bgp/peers/{{Peer.ID}}"{{/if}}
               hx-target="#modal-container" hx-swap="innerHTML">
@@ -1010,7 +1010,7 @@
                 {{#each ValidationErrors}}{{#if (eq Field "name")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
             </label>
 
-            <input type="hidden" name="bgpEnabled" value="on">
+            <input type="hidden" name="bgpAktiviert" value="on">
             <label>
                 <input type="checkbox" name="bgpConnect" {{#if Peer.Connect}}checked{{/if}} title="Actively initiate connection to the peer"> Connect
             </label>
@@ -1060,14 +1060,14 @@
                 <div id="bgp-route-filters-list">
                     {{#each Peer.RouteFilters}}
                     <div class="route-filter-row" style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-                        <input type="text" name="filterPrefix[]" value="{{Prefix}}" placeholder="Prefix (e.g. 10.1.0.0/16)" style="flex:1">
+                        <input type="text" name="filterPrefix[]" value="{{Prefix}}" placeholder="Präfix (z. B. 10.1.0.0/16)" style="flex:1">
                         <select name="filterMatcher[]" style="width:auto">
-                            <option value="exact" {{#if (eq Matcher "exact")}}selected{{/if}}>Exact</option>
-                            <option value="orlonger" {{#if (eq Matcher "orlonger")}}selected{{/if}}>Or Longer</option>
+                            <option value="exact" {{#if (eq Matcher "exact")}}selected{{/if}}>Exakt</option>
+                            <option value="orlonger" {{#if (eq Matcher "orlonger")}}selected{{/if}}>Oder länger</option>
                         </select>
                         <select name="filterAction[]" style="width:auto">
-                            <option value="accept" {{#if (eq Action "accept")}}selected{{/if}}>Accept</option>
-                            <option value="reject" {{#if (eq Action "reject")}}selected{{/if}}>Reject</option>
+                            <option value="accept" {{#if (eq Action "accept")}}selected{{/if}}>Annehmen</option>
+                            <option value="reject" {{#if (eq Action "reject")}}selected{{/if}}>Ablehnen</option>
                         </select>
                         <button type="button" class="btn btn-outline-danger" style="width:auto" onclick="this.closest('.route-filter-row').remove()">X</button>
                     </div>
@@ -1082,14 +1082,14 @@
                 <div id="bgp-export-filters-list">
                     {{#each Peer.ExportFilters}}
                     <div class="route-filter-row" style="display:flex; gap:0.5rem; margin-bottom:0.5rem;">
-                        <input type="text" name="exportFilterPrefix[]" value="{{Prefix}}" placeholder="Prefix (e.g. 10.1.0.0/16)" style="flex:1">
+                        <input type="text" name="exportFilterPrefix[]" value="{{Prefix}}" placeholder="Präfix (z. B. 10.1.0.0/16)" style="flex:1">
                         <select name="exportFilterMatcher[]" style="width:auto">
-                            <option value="exact" {{#if (eq Matcher "exact")}}selected{{/if}}>Exact</option>
-                            <option value="orlonger" {{#if (eq Matcher "orlonger")}}selected{{/if}}>Or Longer</option>
+                            <option value="exact" {{#if (eq Matcher "exact")}}selected{{/if}}>Exakt</option>
+                            <option value="orlonger" {{#if (eq Matcher "orlonger")}}selected{{/if}}>Oder länger</option>
                         </select>
                         <select name="exportFilterAction[]" style="width:auto">
-                            <option value="accept" {{#if (eq Action "accept")}}selected{{/if}}>Accept</option>
-                            <option value="reject" {{#if (eq Action "reject")}}selected{{/if}}>Reject</option>
+                            <option value="accept" {{#if (eq Action "accept")}}selected{{/if}}>Annehmen</option>
+                            <option value="reject" {{#if (eq Action "reject")}}selected{{/if}}>Ablehnen</option>
                         </select>
                         <button type="button" class="btn btn-outline-danger" style="width:auto" onclick="this.closest('.route-filter-row').remove()">X</button>
                     </div>
@@ -1100,14 +1100,14 @@
 
             <fieldset>
                 <label>
-                    <input type="checkbox" name="enabled" {{#if (or Defaults Peer.Enabled)}}checked{{/if}}>
-                    Enabled
+                    <input type="checkbox" name="enabled" {{#if (or Defaults Peer.Aktiviert)}}checked{{/if}}>
+                    Aktiviert
                 </label>
             </fieldset>
 
             <footer>
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary">{{#if IsNew}}Create Peer{{else}}Save Changes{{/if}}</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">{{#if IsNew}}Peer erstellen{{else}}Änderungen speichern{{/if}}</button>
             </footer>
         </form>
     </article>
@@ -1127,30 +1127,30 @@
     <section class="config-section">
         <form hx-put="bgp/server" hx-target="#tab-content" hx-swap="innerHTML">
             <fieldset>
-                <legend>BGP Server Configuration</legend>
+                <legend>BGP-Serverkonfiguration</legend>
                 <label>
-                    <input type="checkbox" name="bgpEnabled" {{#if BGPServer.Enabled}}checked{{/if}}>
-                    Enable BGP Server
+                    <input type="checkbox" name="bgpAktiviert" {{#if BGPServer.Aktiviert}}checked{{/if}}>
+                    Aktivieren BGP Server
                 </label>
                 <div class="grid">
                     <label>
-                        Local ASN
+                        Lokale ASN
                         <input type="number" name="bgpAsn" value="{{#if BGPServer.ASN}}{{BGPServer.ASN}}{{else}}64512{{/if}}" placeholder="64512" {{#if (hasField ValidationErrors "bgpAsn")}}aria-invalid="true"{{/if}}>
                         {{#each ValidationErrors}}{{#if (eq Field "bgpAsn")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
                     </label>
                     <label>
-                        Listen Address
+                        Listen-Adresse
                         <input type="text" name="bgpListenAddress" value="{{BGPServer.ListenAddress}}" placeholder="Optional; defaults to all WireGuard and ZeroTier addresses" {{#if (hasField ValidationErrors "bgpListenAddress")}}aria-invalid="true"{{/if}}>
                         {{#each ValidationErrors}}{{#if (eq Field "bgpListenAddress")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
                     </label>
                     <label>
-                        Listen Port
+                        Listen-Port
                         <input type="number" name="bgpListenPort" value="{{#if BGPServer.ListenPort}}{{BGPServer.ListenPort}}{{else}}179{{/if}}" min="1" max="65535" placeholder="179" {{#if (hasField ValidationErrors "bgpListenPort")}}aria-invalid="true"{{/if}}>
                         {{#each ValidationErrors}}{{#if (eq Field "bgpListenPort")}}<small class="field-error">{{Message}}</small>{{/if}}{{/each}}
                     </label>
                 </div>
             </fieldset>
-            <button type="submit" class="btn btn-primary">Save BGP Settings</button>
+            <button type="submit" class="btn btn-primary">BGP-Einstellungen speichern</button>
         </form>
     </section>
 
@@ -1171,7 +1171,7 @@
 <script type="text/x-handlebars-template" id="bgp-live-stats-template">
     {{#unless running}}
     <article class="toast toast-error">
-        BGP Service is currently disabled or not started. Enable it in the BGP Server Configuration above.
+        BGP Service is currently disabled or not started. Aktivieren it in the BGP-Serverkonfiguration above.
     </article>
     {{else}}
     <div class="grid" style="margin-bottom: 2rem;">
@@ -1180,7 +1180,7 @@
             <div>{{routerId}}</div>
         </article>
         <article class="stat-card">
-            <header><strong>Local ASN</strong></header>
+            <header><strong>Lokale ASN</strong></header>
             <div>{{asn}}</div>
         </article>
         <article class="stat-card">
@@ -1189,9 +1189,9 @@
         </article>
     </div>
 
-    <h3>Sessions</h3>
+    <h3>Sitzungen</h3>
     {{#unless peers}}
-    <p>No active BGP sessions.</p>
+    <p>Keine aktiven BGP-Sitzungen.</p>
     {{else}}
     {{#each peers}}
     <article>
@@ -1210,7 +1210,7 @@
 
         {{#if routes}}
         <details data-route-key="{{ip}}-received">
-            <summary><strong><small>Received routes ({{len routes}})</small></strong></summary>
+            <summary><strong><small>Empfangene Routen ({{len routes}})</small></strong></summary>
             <div class="table-responsive">
             <table role="grid">
                 <thead>
@@ -1224,13 +1224,13 @@
                 </thead>
                 <tbody>
                     {{#each routes}}
-                    <tr class="{{#if (ne status "Accepted")}}route-filtered{{/if}} {{#if (gt @index 9)}}hidden-route{{/if}}">
+                    <tr class="{{#if (ne status "Annehmened")}}route-filtered{{/if}} {{#if (gt @index 9)}}hidden-route{{/if}}">
                         <td><code>{{prefix}}</code></td>
                         <td><code>{{nextHop}}</code></td>
                         <td>{{localPref}}</td>
                         <td>{{#if asPath}}{{asPath}}{{else}}Local{{/if}}</td>
                         <td>
-                            {{#if (eq status "Accepted")}}<span class="badge badge-ok">{{status}}</span>
+                            {{#if (eq status "Annehmened")}}<span class="badge badge-ok">{{status}}</span>
                             {{else}}<span class="badge badge-via">{{status}}</span>{{/if}}
                         </td>
                     </tr>
@@ -1246,7 +1246,7 @@
 
         {{#if advertisedRoutes}}
         <details data-route-key="{{ip}}-advertised">
-            <summary><strong><small>Advertised routes ({{len advertisedRoutes}})</small></strong></summary>
+            <summary><strong><small>Angekündigte Routen ({{len advertisedRoutes}})</small></strong></summary>
             <div class="table-responsive">
             <table role="grid">
                 <thead>
@@ -1287,20 +1287,20 @@
 <dialog id="passkey-modal">
     <article>
         <header class="flex-row">
-            <p class="mb-0"><strong>Add Admin Passkey</strong></p>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
+            <p class="mb-0"><strong>Admin-Passkey hinzufügen</strong></p>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="closeModal()">✕</button>
         </header>
         <form onsubmit="submitPasskeyRegistration(event, this)">
             <label>
-                Passkey Name *
+                Passkey-Name *
                 <input type="text" name="passkeyName" id="passkey-name-input" value="{{DefaultName}}" required maxlength="64" placeholder="e.g. MacBook Pro Touch ID, YubiKey 5C">
                 <small>Give this passkey a friendly label to recognize the device or security key.</small>
             </label>
             <p><small class="text-muted">When you click Register, your browser will prompt you to authenticate with your biometric sensor (Touch ID, Face ID, Windows Hello) or security key.</small></p>
             <div id="passkey-reg-error" class="toast toast-error" style="display: none; margin-bottom: 1rem;" role="alert"></div>
             <footer>
-                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button type="submit" id="passkey-reg-submit-btn" class="btn btn-primary">Register Passkey</button>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+                <button type="submit" id="passkey-reg-submit-btn" class="btn btn-primary">Passkey registrieren</button>
             </footer>
         </form>
     </article>
@@ -1311,18 +1311,18 @@
 <dialog id="passkey-prompt-dialog">
     <article>
         <header class="flex-row">
-            <p class="mb-0"><strong>Secure Your Server with an Admin Passkey</strong></p>
-            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="dismissPasskeyPrompt(false)">✕</button>
+            <p class="mb-0"><strong>Server mit einem Admin-Passkey absichern</strong></p>
+            <button aria-label="Schließen" class="btn btn-outline secondary mb-0" style="padding: 0.2rem 0.6rem; min-height: 32px;" onclick="dismissPasskeyPrompt(false)">✕</button>
         </header>
         <div>
             <p>No admin passkey is configured for this WireGuard server. Register a passkey to enable biometric (Touch ID, Face ID, Windows Hello) or hardware key (YubiKey) protection.</p>
             <p><small class="text-muted">You can manage passkeys and toggle login requirements anytime in the <strong>Server</strong> tab.</small></p>
         </div>
         <footer style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
-            <button type="button" class="btn btn-link secondary" style="padding: 0; font-size: 0.85em; text-decoration: underline; background: none; border: none; cursor: pointer;" onclick="dismissPasskeyPrompt(true)">Don't ask again</button>
+            <button type="button" class="btn btn-link secondary" style="padding: 0; font-size: 0.85em; text-decoration: underline; background: none; border: none; cursor: pointer;" onclick="dismissPasskeyPrompt(true)">Nicht mehr fragen</button>
             <div style="display: flex; gap: 0.5rem;">
-                <button type="button" class="btn btn-secondary" onclick="dismissPasskeyPrompt(false)">Remind Me Later</button>
-                <button type="button" class="btn btn-primary" onclick="openAddPasskeyModal()">+ Add Passkey</button>
+                <button type="button" class="btn btn-secondary" onclick="dismissPasskeyPrompt(false)">Später erinnern</button>
+                <button type="button" class="btn btn-primary" onclick="openAddPasskeyModal()">+ Passkey hinzufügen</button>
             </div>
         </footer>
     </article>
@@ -1339,7 +1339,7 @@
                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                 </svg>
             </div>
-            <h2>Admin Login</h2>
+            <h2>Admin-Anmeldung</h2>
             <p class="text-muted">This WireGuard server requires an Admin Passkey to access management functions.</p>
         </header>
 
@@ -1352,7 +1352,7 @@
                     <path d="M12 8v4"></path>
                     <path d="M12 16h.01"></path>
                 </svg>
-                Sign In with Passkey
+                Mit Passkey anmelden
             </button>
         </div>
     </article>
