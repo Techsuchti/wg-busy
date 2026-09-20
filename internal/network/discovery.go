@@ -18,13 +18,24 @@ const (
 	maxScanHosts = 1024
 )
 
-// ScanPeer discovers IPv4 hosts on networks advertised by the selected peer.
-// It deliberately scans only the peer's configured AdvertisedRoutes; it never
-// probes arbitrary networks. This makes the feature useful for routers/LANs
-// behind a WireGuard peer while keeping the scan scope explicit.
-func ScanPeer(peer models.Peer) ([]models.PeerNetworkDevice, error) {
+// ScanPeer discovers IPv4 hosts behind a WireGuard peer. If explicitCIDR is
+// supplied it is used first. Otherwise the scanner uses AdvertisedRoutes and,
+// as a fallback, non-host IPv4 AllowedIPs configured for the peer. This means
+// a normal routed peer can be scanned without duplicating its network in a
+// second UI field, while an explicit CIDR is still available for unusual setups.
+func ScanPeer(peer models.Peer, explicitCIDR string) ([]models.PeerNetworkDevice, error) {
+	var rawNetworks []string
+	if strings.TrimSpace(explicitCIDR) != "" {
+		rawNetworks = strings.FieldsFunc(explicitCIDR, func(r rune) bool { return r == ',' || r == ';' || r == '\\n' || r == '\\r' || r == ' ' || r == '\\t' })
+	} else {
+		rawNetworks = append(rawNetworks, peer.AdvertisedRoutes...)
+		if len(rawNetworks) == 0 {
+			rawNetworks = append(rawNetworks, peer.AllowedIPs...)
+		}
+	}
+
 	var networks []*net.IPNet
-	for _, raw := range peer.AdvertisedRoutes {
+	for _, raw := range rawNetworks {
 		_, network, err := net.ParseCIDR(strings.TrimSpace(raw))
 		if err != nil {
 			continue
@@ -37,7 +48,7 @@ func ScanPeer(peer models.Peer) ([]models.PeerNetworkDevice, error) {
 	}
 
 	if len(networks) == 0 {
-		return nil, fmt.Errorf("der Peer hat keine gültigen IPv4-Netze unter „Advertised Routes“ eingetragen")
+		return nil, fmt.Errorf("keine gültigen IPv4-Netze gefunden. Trage unter „Angekündigte Routen“ ein LAN-Netz ein oder gib beim Scan ein CIDR an, z. B. 192.168.178.0/24")
 	}
 
 	var hosts []net.IP
