@@ -3,6 +3,7 @@ package handlers
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -27,7 +28,8 @@ func (h *handler) DownloadClientConfig(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		content, genErr = wireguard.RenderClientConfig(cfg.Server, *peer)
+		endpoint := clientEndpointFromRequest(r, cfg.Server.ListenPort)
+		content, genErr = wireguard.RenderClientConfigWithEndpoint(cfg.Server, *peer, endpoint)
 		if genErr != nil {
 			return
 		}
@@ -102,4 +104,35 @@ func (h *handler) ApplyConfig(w http.ResponseWriter, r *http.Request) {
 
 	toast := toastData{Kind: "success", Message: "WireGuard configuration applied successfully."}
 	writePageJSON(w, http.StatusOK, "empty", struct{}{}, &toast)
+}
+
+// clientEndpointFromRequest derives a WireGuard endpoint from the address used
+// to access the web UI. An explicitly configured Server.Endpoint always wins.
+func clientEndpointFromRequest(r *http.Request, listenPort uint16) string {
+	if r == nil {
+		return ""
+	}
+
+	host := strings.TrimSpace(r.Header.Get("X-Forwarded-Host"))
+	if host == "" {
+		host = strings.TrimSpace(r.Host)
+	}
+	if host == "" {
+		return ""
+	}
+
+	// Remove the web UI port while preserving IPv6 literals.
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	} else {
+		host = strings.Trim(host, "[]")
+	}
+	if host == "" {
+		return ""
+	}
+
+	if ip := net.ParseIP(host); ip != nil && ip.To4() == nil {
+		return fmt.Sprintf("[%s]:%d", host, listenPort)
+	}
+	return fmt.Sprintf("%s:%d", host, listenPort)
 }
