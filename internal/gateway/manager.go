@@ -336,7 +336,7 @@ func (m *Manager) Reconcile(cfg models.AppConfig) {
 		if g.Interface == "" {
 			g.Interface = SafeInterfaceName(g.ID)
 		}
-		if !g.Enabled {
+		if !g.Enabled || !g.AutoStart {
 			_ = m.stopLocked(g)
 			continue
 		}
