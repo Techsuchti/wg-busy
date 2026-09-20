@@ -1,7 +1,7 @@
 services:
   wg-busy:
     build: .
-    image: ghcr.io/techsuchti/wg-busy:1.0.3
+    image: ghcr.io/techsuchti/wg-busy:1.0.4
     container_name: wg-busy
     security_opt:
       - systempaths=unconfined
