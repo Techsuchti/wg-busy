@@ -709,6 +709,21 @@
         });
 
     </script>
+
+        function filterGatewayAssignments(query) {
+            var q = (query || '').trim().toLowerCase();
+            var rows = document.querySelectorAll('#gateway-assignments .assignment-row');
+            var visible = 0;
+            rows.forEach(function(row) {
+                var name = (row.getAttribute('data-assignment-name') || '').toLowerCase();
+                var show = !q || name.indexOf(q) !== -1;
+                row.style.display = show ? '' : 'none';
+                if (show) visible++;
+            });
+            var count = document.getElementById('gateway-assignment-count');
+            if (count) count.textContent = visible;
+        }
+
 </body>
 
 </html>
