@@ -65,12 +65,22 @@
                 onclick="selectTab(this)">
                 VPN Gateways
             </button>
+            <button id="tab-system" role="tab" data-stats-kind="server" hx-get="system" hx-target="#tab-content" hx-swap="innerHTML"
+                onclick="selectTab(this)">
+                System & Diagnose
+            </button>
         </div>
 
         <div id="tab-content" hx-get="peers" hx-trigger="templates-ready from:body" hx-swap="innerHTML">
         </div>
 
         <div id="modal-container"></div>
+
+        <footer class="app-footer">
+            <span>wg-busy</span>
+            <span>Version <strong><span id="footer-version">dev</span></strong></span>
+            <span>WireGuard Manager</span>
+        </footer>
     </main>
 
     <!-- popover puts toasts in the top layer, so they stay readable over an open modal. -->
@@ -103,7 +113,7 @@
         }
         initTheme();
 
-        // Initial tab routing via query parameter (?tab=server|bgp|zerotier|gateways|assignments)
+        // Initial tab routing via query parameter (?tab=server|bgp|zerotier|gateways|system|assignments)
         var targetTab = urlParams.get('tab');
         if (targetTab) {
             var tabBtn = document.querySelector('.tabs button[data-stats-kind="' + targetTab + '"]');
@@ -123,6 +133,20 @@
                 }, 100);
             });
         }
+
+        // Keep the version visible in the panel footer as well as the header.
+        document.body.addEventListener('templates-ready', function () {
+            var versionNode = document.getElementById('footer-version');
+            if (!versionNode) return;
+            fetch('version', { headers: { 'HX-Request': 'true' } })
+                .then(function (r) { return r.json(); })
+                .then(function (payload) {
+                    if (payload && payload.Data && payload.Data.Version) {
+                        versionNode.textContent = payload.Data.Version;
+                    }
+                })
+                .catch(function () {});
+        });
 
         function copyText(text, btn) {
             if (!navigator.clipboard) return;
