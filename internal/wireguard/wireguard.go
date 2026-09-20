@@ -336,6 +336,11 @@ func RenderClientConfigWithEndpoint(server models.ServerConfig, peer models.Peer
 	if clientAllowedIPs == "" {
 		clientAllowedIPs = "0.0.0.0/0, ::/0"
 	}
+	// Keep the local Unraid/LAN subnet reachable even when all other traffic
+	// uses the selected VPN gateway.
+	if !strings.Contains(clientAllowedIPs, "192.168.178.0/24") {
+		clientAllowedIPs = strings.TrimSpace(clientAllowedIPs) + ", 192.168.178.0/24"
+	}
 
 	endpoint := strings.TrimSpace(endpointOverride)
 	if endpoint == "" {
