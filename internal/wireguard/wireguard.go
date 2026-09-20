@@ -314,6 +314,14 @@ func hookLines(value string) []string {
 
 // RenderClientConfig produces a client .conf file for a specific peer.
 func RenderClientConfig(server models.ServerConfig, peer models.Peer) (string, error) {
+	return RenderClientConfigWithEndpoint(server, peer, "")
+}
+
+// RenderClientConfigWithEndpoint renders a client configuration. When endpointOverride
+// is set, it is used as the WireGuard server endpoint; otherwise Server.Endpoint is used.
+// This lets the HTTP handlers automatically derive the server address from the address
+// the administrator used to access the web UI when no explicit endpoint is configured.
+func RenderClientConfigWithEndpoint(server models.ServerConfig, peer models.Peer, endpointOverride string) (string, error) {
 	serverPub, err := PublicKeyFromPrivate(server.PrivateKey)
 	if err != nil {
 		return "", fmt.Errorf("deriving server public key: %w", err)
@@ -329,7 +337,10 @@ func RenderClientConfig(server models.ServerConfig, peer models.Peer) (string, e
 		clientAllowedIPs = "0.0.0.0/0, ::/0"
 	}
 
-	endpoint := server.Endpoint
+	endpoint := strings.TrimSpace(endpointOverride)
+	if endpoint == "" {
+		endpoint = strings.TrimSpace(server.Endpoint)
+	}
 	if endpoint == "" {
 		endpoint = fmt.Sprintf("SERVER_IP:%d", server.ListenPort)
 	}
