@@ -553,14 +553,17 @@ func gatewayRouteCommands(cfg models.AppConfig, action string) []string {
 			// main table. Table=off prevents the imported config from changing it;
 			// this policy table is only used after source-based selection.
 			cmd := fmt.Sprintf("ip route %s default dev %s table %d", action, g.Interface, g.RoutingTableID)
-			if action == "del" {
+			// Gateway interfaces are started by gateway.Manager after wg0. A route
+			// hook during wg0 startup may therefore run before the interface exists;
+			// ReapplyRouting installs it once the gateway is up.
+			if action == "del" || action == "replace" {
 				cmd += " 2>/dev/null || true"
 			}
 			cmds = append(cmds, cmd)
 		}
 		if hasV6 {
 			cmd := fmt.Sprintf("ip -6 route %s default dev %s table %d", action, g.Interface, g.RoutingTableID)
-			if action == "del" {
+			if action == "del" || action == "replace" {
 				cmd += " 2>/dev/null || true"
 			}
 			cmds = append(cmds, cmd)
@@ -753,6 +756,20 @@ func generatePostUpCommands(cfg models.AppConfig, gateways []models.GatewayNet, 
 			r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Dest, r.Priority))
 	}
 
+	// Source-based rules for peers assigned to imported VPN gateways.
+	// These are deliberately after LAN bypass rules so local networks stay on
+	// the normal path, and before the main table (32766) so internet traffic
+	// follows the selected gateway. The trailing prohibit rule prevents fallback.
+	for _, r := range vpnGatewayRules(cfg) {
+		if r.Table == 0 {
+			cmds = append(cmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s prohibit priority %d",
+				r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
+		} else {
+			cmds = append(cmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s table %d priority %d",
+				r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Table, r.Priority))
+		}
+	}
+
 	// Policy rules for exit nodes, policy routes, and strict rejects.
 	//
 	// Each add is preceded by a delete of whatever holds that priority: `ip rule
@@ -888,11 +905,23 @@ func generatePostDownCommands(cfg models.AppConfig, gateways []models.GatewayNet
 		cmds = append(cmds, fmt.Sprintf("%s rule del from %s to %s table main priority %d || true", r.IPCommand, r.Source, r.Dest, r.Priority))
 	}
 
+	// Remove source-based VPN gateway rules first.
+	for _, r := range vpnGatewayRules(cfg) {
+		if r.Table == 0 {
+			cmds = append(cmds, fmt.Sprintf("%s rule del from %s prohibit priority %d || true", r.IPCommand, r.Source, r.Priority))
+		} else {
+			cmds = append(cmds, fmt.Sprintf("%s rule del from %s table %d priority %d || true", r.IPCommand, r.Source, r.Table, r.Priority))
+		}
+	}
+
 	// Remove policy rules first. Deleting by priority is exact, so repeated
 	// apply cycles cannot leave duplicates behind.
 	for _, r := range peerRules(cfg, exitNodes) {
 		cmds = append(cmds, fmt.Sprintf("%s rule del %s %s priority %d || true", r.IPCommand, r.Selector, r.Action, r.Priority))
 	}
+
+	// Remove gateway default routes.
+	cmds = append(cmds, gatewayRouteCommands(cfg, "del")...)
 
 	// Remove routing tables.
 	cmds = append(cmds, exitNodeRouteCmds("del", exitNodes)...)
