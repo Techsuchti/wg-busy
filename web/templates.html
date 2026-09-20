@@ -76,7 +76,10 @@
 <div id="peers-list" {{#if OOB}}hx-swap-oob="true"{{/if}}>
     <div class="header-row">
         <h2>Peers ({{len Peers}})</h2>
-        <button class="btn btn-primary" hx-get="peers/new" hx-target="#modal-container" hx-swap="innerHTML">+ Add Peer</button>
+        <div class="btn-group">
+            <button class="btn btn-primary" hx-get="peers/quick" hx-target="#modal-container" hx-swap="innerHTML">+ Benutzer</button>
+            <button class="btn btn-outline secondary" hx-get="peers/new" hx-target="#modal-container" hx-swap="innerHTML" title="Erweiterte Peer-Konfiguration">Erweitert</button>
+        </div>
     </div>
     {{#unless Peers}}
     <p>No peers configured. Add one to get started.</p>
