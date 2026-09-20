@@ -59,6 +59,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must contain semver X.Y.Z"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "major_minor=${VERSION%.*}" >> "$GITHUB_OUTPUT"
+          echo "major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+
       # Extract metadata (tags, labels) for Docker
       - name: Extract Docker metadata
         id: meta
@@ -72,18 +85,7 @@ jobs:
             type=raw,value=${{ steps.version.outputs.major_minor }}
             type=raw,value=${{ steps.version.outputs.major }}
 
-      - name: Read release version
-        id: version
-        shell: bash
-        run: |
-          VERSION="$(tr -d '[:space:]' < VERSION)"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "VERSION must contain semver X.Y.Z"
-            exit 1
-          fi
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "major_minor=${VERSION%.*}" >> "$GITHUB_OUTPUT"
-          echo "major=${VERSION%%.*}" >> "$GITHUB_OUTPUT"
+
 
       # Set up Go and cross-compile binaries for all target architectures
       - name: Set up Go
