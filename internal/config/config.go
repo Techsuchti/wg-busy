@@ -496,6 +496,9 @@ func (s *Store) RenderWGConfig() error {
 // WGConfigPath returns the file used for every wg-quick operation.
 func (s *Store) WGConfigPath() string { return s.wgConfigPath }
 
+// ConfigPath returns the YAML source-of-truth configuration path.
+func (s *Store) ConfigPath() string { return s.configPath }
+
 // MarkWireGuardRestarted records that wg-quick successfully installed the
 // complete current configuration, including fields syncconf cannot apply.
 func (s *Store) MarkWireGuardRestarted() {
