@@ -8,9 +8,14 @@ import (
 	"io/fs"
 	"log"
 	"mime"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
 	"net/http"
 	"strconv"
 	"strings"
+	"net"
 
 	"github.com/yix/wg-busy/internal/gateway"
 
@@ -63,6 +68,8 @@ type handler struct {
 	sessions *auth.SessionManager
 	webauthn *auth.WebAuthnService
 	version  string
+	auditMu  sync.Mutex
+	auditPath string
 }
 
 // ztGatewayNets returns the ZeroTier on-link networks, or nil when ZeroTier is
@@ -117,6 +124,7 @@ func logErrors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
+		h.auditMutation(r, rec.status)
 		if rec.status >= 400 {
 			msg := fmt.Sprintf("%d %s %s from %s", rec.status, r.Method, r.URL.Path, r.RemoteAddr)
 			if rec.detail != "" {
@@ -215,6 +223,31 @@ func isCompressible(contentType string) bool {
 	return strings.HasPrefix(mediaType, "text/") || mediaType == "application/json" || mediaType == "application/javascript" || mediaType == "application/xml" || mediaType == "image/svg+xml"
 }
 
+// auditMutation records successful state-changing requests without logging request bodies or secrets.
+func (h *handler) auditMutation(r *http.Request, status int) {
+	if status >= 400 || (r.Method != http.MethodPost && r.Method != http.MethodPut && r.Method != http.MethodDelete && r.Method != http.MethodPatch) {
+		return
+	}
+	h.auditMu.Lock()
+	defer h.auditMu.Unlock()
+	if h.auditPath == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(h.auditPath), 0700); err != nil {
+		return
+	}
+	f, err := os.OpenFile(h.auditPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	remote := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(remote); err == nil {
+		remote = host
+	}
+	_, _ = fmt.Fprintf(f, "%s %s %s from %s status=%d\\n", time.Now().UTC().Format(time.RFC3339), r.Method, r.URL.Path, remote, status)
+}
+
 // requireAuth checks whether passkey authentication is enforced and valid.
 func (h *handler) requireAuth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -280,6 +313,7 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 		sessions: sessions,
 		webauthn: webauthn,
 		version:  version,
+		auditPath: filepath.Join(filepath.Dir(store.ConfigPath()), "audit.log"),
 	}
 
 	mux := http.NewServeMux()
