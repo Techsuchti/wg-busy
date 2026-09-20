@@ -92,7 +92,8 @@ func (h *handler) QRCode(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		content, genErr = wireguard.RenderClientConfig(cfg.Server, *peer)
+		endpoint := clientEndpointFromRequest(r, cfg.Server.ListenPort)
+		content, genErr = wireguard.RenderClientConfigWithEndpoint(cfg.Server, *peer, endpoint)
 	})
 
 	if genErr != nil {
