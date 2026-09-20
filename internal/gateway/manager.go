@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.zx2c4.com/wireguard/wgctrl"
+
 	"github.com/yix/wg-busy/internal/models"
 )
 
@@ -21,14 +23,18 @@ const (
 )
 
 type Status struct {
-	ID          string
-	Name        string
-	Interface   string
-	Enabled     bool
-	Running     bool
-	LastError   string
-	LastChange  time.Time
-	Endpoint    string
+	ID              string
+	Name            string
+	Interface       string
+	Enabled         bool
+	Running         bool
+	LastError       string
+	LastChange      time.Time
+	Endpoint        string
+	LatestHandshake time.Time
+	ReceiveBytes    int64
+	TransmitBytes   int64
+	PeerCount       int
 }
 
 type Manager struct {
@@ -311,12 +317,34 @@ func (m *Manager) Status(id string) Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	s := m.status[id]
-	if s.Interface != "" {
-		if _, err := command("ip", "link", "show", "dev", s.Interface); err == nil {
-			s.Running = true
-		} else {
-			s.Running = false
+	if s.Interface == "" {
+		return s
+	}
+	if _, err := command("ip", "link", "show", "dev", s.Interface); err == nil {
+		s.Running = true
+	} else {
+		s.Running = false
+		return s
+	}
+
+	// Read-only WireGuard telemetry is used for the dashboard and diagnostics.
+	// Never expose private or preshared keys through Status.
+	client, err := wgctrl.New()
+	if err != nil {
+		return s
+	}
+	defer client.Close()
+	device, err := client.Device(s.Interface)
+	if err != nil {
+		return s
+	}
+	s.PeerCount = len(device.Peers)
+	for _, peer := range device.Peers {
+		if peer.LastHandshakeTime.After(s.LatestHandshake) {
+			s.LatestHandshake = peer.LastHandshakeTime
 		}
+		s.ReceiveBytes += peer.ReceiveBytes
+		s.TransmitBytes += peer.TransmitBytes
 	}
 	return s
 }
