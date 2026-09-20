@@ -508,8 +508,8 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 			fmt.Sprintf("iptables -w -N %s 2>/dev/null || true", gatewayChainV4),
 			fmt.Sprintf("iptables -w -F %s", gatewayChainV4),
 			fmt.Sprintf("iptables -w -C FORWARD -i %s -j %s 2>/dev/null || iptables -w -I FORWARD 1 -i %s -j %s", models.WGDevice, gatewayChainV4, models.WGDevice, gatewayChainV4),
-			fmt.Sprintf("iptables -w -N %s 2>/dev/null || true", gatewayNatChainV4),
-			fmt.Sprintf("iptables -w -F %s", gatewayNatChainV4),
+			fmt.Sprintf("iptables -t nat -w -N %s 2>/dev/null || true", gatewayNatChainV4),
+			fmt.Sprintf("iptables -t nat -w -F %s", gatewayNatChainV4),
 			fmt.Sprintf("iptables -t nat -w -C POSTROUTING -j %s 2>/dev/null || iptables -t nat -w -I POSTROUTING 1 -j %s", gatewayNatChainV4, gatewayNatChainV4),
 			fmt.Sprintf("ip6tables -w -N %s 2>/dev/null || true", gatewayChainV6),
 			fmt.Sprintf("ip6tables -w -F %s", gatewayChainV6),
@@ -535,7 +535,7 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 					cmds = append(cmds,
 						fmt.Sprintf("iptables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV4, source, g.Interface),
 						fmt.Sprintf("iptables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, source, models.WGDevice),
-						fmt.Sprintf("iptables -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, source, g.Interface),
+						fmt.Sprintf("iptables -t nat -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, source, g.Interface),
 					)
 				}
 			}
@@ -548,8 +548,8 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 		fmt.Sprintf("iptables -w -F %s 2>/dev/null || true", gatewayChainV4),
 		fmt.Sprintf("iptables -w -X %s 2>/dev/null || true", gatewayChainV4),
 		fmt.Sprintf("iptables -t nat -w -D POSTROUTING -j %s 2>/dev/null || true", gatewayNatChainV4),
-		fmt.Sprintf("iptables -w -F %s 2>/dev/null || true", gatewayNatChainV4),
-		fmt.Sprintf("iptables -w -X %s 2>/dev/null || true", gatewayNatChainV4),
+		fmt.Sprintf("iptables -t nat -w -F %s 2>/dev/null || true", gatewayNatChainV4),
+		fmt.Sprintf("iptables -t nat -w -X %s 2>/dev/null || true", gatewayNatChainV4),
 		fmt.Sprintf("ip6tables -w -D FORWARD -i %s -j %s 2>/dev/null || true", models.WGDevice, gatewayChainV6),
 		fmt.Sprintf("ip6tables -w -F %s 2>/dev/null || true", gatewayChainV6),
 		fmt.Sprintf("ip6tables -w -X %s 2>/dev/null || true", gatewayChainV6),
