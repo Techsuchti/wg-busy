@@ -62,6 +62,7 @@ type handler struct {
 	gateway  *gateway.Manager
 	sessions *auth.SessionManager
 	webauthn *auth.WebAuthnService
+	version  string
 }
 
 // ztGatewayNets returns the ZeroTier on-link networks, or nil when ZeroTier is
@@ -278,6 +279,7 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 		gateway:  gatewayManager,
 		sessions: sessions,
 		webauthn: webauthn,
+		version:  version,
 	}
 
 	mux := http.NewServeMux()
@@ -329,6 +331,9 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 	mux.HandleFunc("POST /bgp/peers", h.CreateBGPPeer)
 	mux.HandleFunc("PUT /bgp/peers/{id}", h.UpdateBGPPeer)
 	mux.HandleFunc("DELETE /bgp/peers/{id}", h.DeleteBGPPeer)
+
+	// System / diagnostics endpoint.
+	mux.HandleFunc("GET /system", h.GetSystemTab)
 
 	// VPN gateway endpoints.
 	mux.HandleFunc("GET /gateway-assignments", h.GetGatewayAssignments)
