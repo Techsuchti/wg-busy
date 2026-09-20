@@ -124,7 +124,6 @@ func logErrors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
 		next.ServeHTTP(rec, r)
-		h.auditMutation(r, rec.status)
 		if rec.status >= 400 {
 			msg := fmt.Sprintf("%d %s %s from %s", rec.status, r.Method, r.URL.Path, r.RemoteAddr)
 			if rec.detail != "" {
@@ -246,6 +245,15 @@ func (h *handler) auditMutation(r *http.Request, status int) {
 		remote = host
 	}
 	_, _ = fmt.Fprintf(f, "%s %s %s from %s status=%d\\n", time.Now().UTC().Format(time.RFC3339), r.Method, r.URL.Path, remote, status)
+}
+
+// auditMiddleware records successful state-changing requests after authentication.
+func (h *handler) auditMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
+		h.auditMutation(r, rec.status)
+	})
 }
 
 // requireAuth checks whether passkey authentication is enforced and valid.
@@ -394,5 +402,5 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 	mux.HandleFunc("POST /api/peers/{id}/regenerate-keys", h.RegeneratePeerKeys)
 	mux.HandleFunc("POST /api/zerotier/restart", h.RestartZeroTier)
 
-	return gzipResponses(logErrors(h.requireAuth(mux)))
+	return gzipResponses(logErrors(h.auditMiddleware(h.requireAuth(mux))))
 }
