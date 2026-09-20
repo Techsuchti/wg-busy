@@ -50,11 +50,10 @@ func ScanPeer(peer models.Peer) ([]models.PeerNetworkDevice, error) {
 		if count > maxScanHosts {
 			return nil, fmt.Errorf("Netz %s ist zu groß für einen Scan (maximal %d Hosts)", network.String(), maxScanHosts)
 		}
+		base := uint32(network.IP[0])<<24 | uint32(network.IP[1])<<16 | uint32(network.IP[2])<<8 | uint32(network.IP[3])
 		for i := 1; i < count-1; i++ {
-			ip := append(net.IP(nil), network.IP...)
-			for j := 3; j >= 0; j-- {
-				ip[j] += byte(i >> uint(8*(3-j)))
-			}
+			v := base + uint32(i)
+			ip := net.IPv4(byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
 			hosts = append(hosts, ip)
 		}
 	}
