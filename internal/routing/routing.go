@@ -481,6 +481,9 @@ func gatewayRouteCommands(cfg models.AppConfig, action string) []string {
 			}
 		}
 		if hasV4 {
+			// WireGuard's encrypted endpoint itself must stay reachable via the
+			// main table. Table=off prevents the imported config from changing it;
+			// this policy table is only used after source-based selection.
 			cmd := fmt.Sprintf("ip route %s default dev %s table %d", action, g.Interface, g.RoutingTableID)
 			if action == "del" {
 				cmd += " 2>/dev/null || true"
