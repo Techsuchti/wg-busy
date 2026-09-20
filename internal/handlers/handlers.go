@@ -357,6 +357,10 @@ func NewRouter(store *config.Store, webFS fs.FS, stats *wgstats.Collector, zt *z
 
 	// QR code modal (HTML dialog).
 	mux.HandleFunc("GET /peers/{id}/qr", h.QRCodeModal)
+	// Per-peer LAN device discovery and device-specific routing.
+	mux.HandleFunc("GET /peers/{id}/network-devices", h.GetPeerNetworkDevices)
+	mux.HandleFunc("POST /peers/{id}/network-scan", h.ScanPeerNetworkDevices)
+	mux.HandleFunc("PUT /peers/{id}/device-routes/{ip}", h.UpdatePeerDeviceRoute)
 
 	// Server config fragment endpoints.
 	mux.HandleFunc("GET /server", h.GetServerConfig)
