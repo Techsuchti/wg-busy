@@ -353,6 +353,106 @@
 </dialog>
 </script>
 
+
+<script type="text/x-handlebars-template" id="quick-peer-form-template">
+<dialog open>
+    <article class="quick-peer-dialog">
+        <header class="flex-row">
+            <div>
+                <p class="mb-0"><strong>Schnell einen Benutzer anlegen</strong></p>
+                <small class="text-muted">Nur Spitzname eingeben – Schlüssel, IP, PSK und Client-Routen werden automatisch erstellt.</small>
+            </div>
+            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding:.2rem .6rem;min-height:32px" onclick="closeModal()">✕</button>
+        </header>
+        {{#if Error}}<div class="toast toast-error" role="alert">{{Error}}</div>{{/if}}
+        <form hx-post="peers/quick" hx-target="#modal-container" hx-swap="innerHTML">
+            <label>
+                Spitzname *
+                <input type="text" name="name" maxlength="64" required autofocus placeholder="z. B. Manuel Handy">
+            </label>
+            <p class="quick-peer-defaults">
+                <span class="badge badge-ok">IP automatisch</span>
+                <span class="badge badge-ok">Schlüssel automatisch</span>
+                <span class="badge badge-ok">PSK automatisch</span>
+                <span class="badge badge-ok">0.0.0.0/0 + ::/0</span>
+            </p>
+            <footer>
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Abbrechen</button>
+                <button type="submit" class="btn btn-primary">Benutzer erstellen</button>
+            </footer>
+        </form>
+    </article>
+</dialog>
+</script>
+
+<script type="text/x-handlebars-template" id="quick-peer-created-template">
+<dialog open>
+    <article>
+        <header class="flex-row">
+            <div>
+                <p class="mb-0"><strong>Benutzer erstellt</strong></p>
+                <small class="text-muted">{{Peer.Peer.Name}} ist bereit.</small>
+            </div>
+            <button aria-label="Close" class="btn btn-outline secondary mb-0" style="padding:.2rem .6rem;min-height:32px" onclick="closeModal()">✕</button>
+        </header>
+        <div class="toast toast-success">IP: <code>{{Peer.Peer.AllowedIPs}}</code></div>
+        <div class="quick-peer-actions">
+            <button class="btn btn-primary" hx-get="peers/{{Peer.Peer.ID}}/qr" hx-target="#modal-container" hx-swap="innerHTML">QR-Code anzeigen</button>
+            <a href="api/peers/{{Peer.Peer.ID}}/config" download role="button" class="btn btn-outline secondary">WireGuard-Konfiguration herunterladen</a>
+        </div>
+        <p><small>Das VPN-Gateway kann anschließend im Tab „Benutzer &amp; Gateways“ zugewiesen werden.</small></p>
+        <footer>
+            <button type="button" class="btn btn-secondary" onclick="closeModal(); htmx.ajax('GET','peers',{target:'#tab-content',swap:'innerHTML'})">Schließen</button>
+        </footer>
+    </article>
+</dialog>
+</script>
+
+<script type="text/x-handlebars-template" id="gateway-assignments-template">
+<div id="gateway-assignments">
+    <div class="header-row">
+        <div>
+            <h2>Benutzer &amp; VPN-Gateways</h2>
+            <small class="text-muted">Hier wird zentral festgelegt, über welches WireGuard-Uplink-Gateway ein Benutzer ins Internet geht.</small>
+        </div>
+        <button class="btn btn-primary" hx-get="peers/quick" hx-target="#modal-container" hx-swap="innerHTML">+ Benutzer</button>
+    </div>
+
+    <div class="assignment-toolbar">
+        <input type="search" placeholder="Benutzer suchen…" oninput="filterGatewayAssignments(this.value)" aria-label="Benutzer suchen">
+        <span class="text-muted"><span id="gateway-assignment-count">{{len Peers}}</span> Benutzer</span>
+    </div>
+
+    {{#unless Peers}}
+    <article><p>Noch keine Benutzer angelegt.</p><button class="btn btn-primary" hx-get="peers/quick" hx-target="#modal-container" hx-swap="innerHTML">Ersten Benutzer anlegen</button></article>
+    {{else}}
+    <div class="assignment-list">
+        {{#each Peers}}
+        <article class="assignment-row" data-assignment-name="{{Name}}">
+            <div class="assignment-user">
+                <strong>{{Name}}</strong>
+                <small><code>{{AllowedIPs}}</code> · {{#if Enabled}}aktiv{{else}}deaktiviert{{/if}}</small>
+            </div>
+            <form class="assignment-form" hx-put="gateway-assignments/{{ID}}" hx-target="#gateway-assignments" hx-swap="outerHTML">
+                <label>
+                    <span>Gateway</span>
+                    <select name="vpnGatewayID" onchange="this.form.requestSubmit()">
+                        <option value="">Direkter WG-Betrieb</option>
+                        {{#each @root.Gateways}}
+                        <option value="{{ID}}" {{#if (eq ID @../VPNGatewayID)}}selected{{/if}}>
+                            {{Name}} {{#if ../GatewayOnline}}●{{/if}}
+                        </option>
+                        {{/each}}
+                    </select>
+                </label>
+            </form>
+        </article>
+        {{/each}}
+    </div>
+    {{/unless}}
+</div>
+</script>
+
 <script type="text/x-handlebars-template" id="server-config-template">
 <div id="server-config">
     <div class="header-row">
