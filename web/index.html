@@ -708,8 +708,6 @@
             showToast('Could not load UI templates: ' + err.message);
         });
 
-    </script>
-
         function filterGatewayAssignments(query) {
             var q = (query || '').trim().toLowerCase();
             var rows = document.querySelectorAll('#gateway-assignments .assignment-row');
@@ -723,6 +721,8 @@
             var count = document.getElementById('gateway-assignment-count');
             if (count) count.textContent = visible;
         }
+
+    </script>
 
 </body>
 
