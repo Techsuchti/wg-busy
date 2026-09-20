@@ -470,6 +470,21 @@ func localNetworkRules(cfg models.AppConfig) []localNetworkRule {
 			}
 		}
 	}
+	// Device-specific sources must also keep local LAN destinations on the main table.
+	for _, p := range cfg.Peers {
+		if !p.Enabled { continue }
+		for _, device := range p.DeviceRoutingRules {
+			if !device.Enabled { continue }
+			ip := net.ParseIP(strings.TrimSpace(device.DeviceIP))
+			if ip == nil || ip.To4() == nil { continue }
+			for _, dest := range localNetworkCIDRs() {
+				_, dstNet, err := net.ParseCIDR(dest)
+				if err != nil || dstNet.IP.To4() == nil { continue }
+				rules = append(rules, localNetworkRule{IPCommand: "ip", Source: ip.String(), Dest: dest, Priority: priority})
+				priority++
+			}
+		}
+	}
 	return rules
 }
 
@@ -680,6 +695,23 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 						fmt.Sprintf("iptables -t nat -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, source, g.Interface),
 					)
 				}
+			}
+		}
+		// Device-specific gateway assignments need the same forwarding and NAT
+		// permissions as a peer-wide gateway assignment.
+		for _, p := range cfg.Peers {
+			if !p.Enabled { continue }
+			for _, device := range p.DeviceRoutingRules {
+				if !device.Enabled || device.GatewayID == "" { continue }
+				g, ok := gateways[device.GatewayID]
+				if !ok || !g.Enabled || g.Interface == "" { continue }
+				ip := net.ParseIP(strings.TrimSpace(device.DeviceIP))
+				if ip == nil || ip.To4() == nil { continue }
+				cmds = append(cmds,
+					fmt.Sprintf("iptables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV4, ip.String(), g.Interface),
+					fmt.Sprintf("iptables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, ip.String(), models.WGDevice),
+					fmt.Sprintf("iptables -t nat -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, ip.String(), g.Interface),
+				)
 			}
 		}
 		return cmds
