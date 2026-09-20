@@ -66,126 +66,118 @@ type systemPageData struct {
 
 var systemPageTmpl = template.Must(template.New("system").Funcs(template.FuncMap{"ifClass": ifClass}).Parse(`
 <div id="system-page">
-	<div class="header-row">
-		<div>
-			<h2>System &amp; Diagnose</h2>
-			<small class="text-muted">Betriebsstatus, Routing, VPN-Gateways und Sicherheitsprüfungen.</small>
-		</div>
-		<button class="btn btn-outline secondary" hx-get="system" hx-target="#tab-content" hx-swap="innerHTML">↻ Aktualisieren</button>
-	</div>
+  <div class="header-row">
+    <div>
+      <h2>System &amp; Diagnose</h2>
+      <small class="text-muted">Betriebsstatus, Routing, VPN-Gateways und Sicherheitsprüfungen.</small>
+    </div>
+    <button class="btn btn-outline secondary" hx-get="system" hx-target="#tab-content" hx-swap="innerHTML">↻ Aktualisieren</button>
+  </div>
 
-	<div class="grid system-stat-grid">
-		<article class="stat-card"><header><strong>Version</strong></header><div>{{Version}}</div></article>
-		<article class="stat-card"><header><strong>WireGuard</strong></header><div>{{if WireGuardUp}}<span class="status-dot status-up"></span> Online{{else}}<span class="status-dot status-down"></span> Offline{{end}}</div></article>
-		<article class="stat-card"><header><strong>Peers</strong></header><div>{{ActivePeers}} / {{PeerCount}} aktiv</div></article>
-		<article class="stat-card"><header><strong>VPN-Gateways</strong></header><div>{{RunningGateways}} / {{GatewayCount}} aktiv</div></article>
-	</div>
+  <div class="grid system-stat-grid">
+    <article class="stat-card"><header><strong>Version</strong></header><div>{{.Version}}</div></article>
+    <article class="stat-card"><header><strong>WireGuard</strong></header><div>{{if .WireGuardUp}}<span class="status-dot status-up"></span> Online{{else}}<span class="status-dot status-down"></span> Offline{{end}}</div></article>
+    <article class="stat-card"><header><strong>Peers</strong></header><div>{{.ActivePeers}} / {{.PeerCount}} aktiv</div></article>
+    <article class="stat-card"><header><strong>VPN-Gateways</strong></header><div>{{.RunningGateways}} / {{.GatewayCount}} aktiv</div></article>
+  </div>
 
-	<section class="config-section">
-		<h3>Systeminformationen</h3>
-		<div class="table-responsive">
-			<table role="grid">
-				<tbody>
-					<tr><th>Version</th><td><code>{{Version}}</code></td></tr>
-					<tr><th>Go Runtime</th><td><code>{{GoVersion}}</code></td></tr>
-					<tr><th>Plattform</th><td><code>{{OS}} / {{Arch}}</code></td></tr>
-					<tr><th>WireGuard Uptime</th><td>{{Uptime}}</td></tr>
-					<tr><th>IPv6 Full-Tunnel Gateways</th><td>{{IPv6Gateways}}</td></tr>
-				</tbody>
-			</table>
-		</div>
-	</section>
+  <section class="config-section">
+    <h3>Systeminformationen</h3>
+    <div class="table-responsive">
+      <table role="grid"><tbody>
+        <tr><th>Version</th><td><code>{{.Version}}</code></td></tr>
+        <tr><th>Go Runtime</th><td><code>{{.GoVersion}}</code></td></tr>
+        <tr><th>Plattform</th><td><code>{{.OS}} / {{.Arch}}</code></td></tr>
+        <tr><th>WireGuard Uptime</th><td>{{.Uptime}}</td></tr>
+        <tr><th>IPv6 Full-Tunnel Gateways</th><td>{{.IPv6Gateways}}</td></tr>
+      </tbody></table>
+    </div>
+  </section>
 
-	<section class="config-section">
-		<h3>Sicherheitsprüfungen</h3>
-		<div class="system-check-grid">
-			{{#each Checks}}
-			<div class="system-check {{ifClass OK "check-ok" "check-warn"}}">
-				<div><span class="status-dot {{ifClass OK "status-up" "status-down"}}"></span><strong>{{Name}}</strong></div>
-				<small>{{Status}} · {{Detail}}</small>
-			</div>
-			{{/each}}
-		</div>
-	</section>
+  <section class="config-section">
+    <h3>Sicherheitsprüfungen</h3>
+    <div class="system-check-grid">
+      {{range .Checks}}
+      <div class="system-check {{if .OK}}check-ok{{else}}check-warn{{end}}">
+        <div><span class="status-dot {{if .OK}}status-up{{else}}status-down{{end}}"></span><strong>{{.Name}}</strong></div>
+        <small>{{.Status}} · {{.Detail}}</small>
+      </div>
+      {{end}}
+    </div>
+  </section>
 
-	<section class="config-section">
-		<h3>VPN-Gateways</h3>
-		{{if Gateways}}
-		<div class="gateway-grid">
-			{{#each Gateways}}
-			<article class="gateway-card">
-				<header class="flex-row">
-					<div><strong>{{Name}}</strong><div><small><code>{{Interface}}</code> · {{Endpoint}}</small></div></div>
-					{{if Running}}<span class="status-dot status-up" title="Online"></span>{{else}}<span class="status-dot status-down" title="Offline"></span>{{/if}}
-				</header>
-				<div class="system-metrics">
-					<span>Handshake: <strong>{{Handshake}}</strong></span>
-					<span>RX: <strong>{{TransferRX}}</strong></span>
-					<span>TX: <strong>{{TransferTX}}</strong></span>
-					<span>Routing: <strong>{{RoutingTableID}}</strong></span>
-				</div>
-				{{if LastError}}<div class="toast toast-error">{{LastError}}</div>{{/if}}
-			</article>
-			{{/each}}
-		</div>
-		{{else}}<p class="text-muted">Keine VPN-Gateways konfiguriert.</p>{{/if}}
-	</section>
+  <section class="config-section">
+    <h3>VPN-Gateways</h3>
+    {{if .Gateways}}
+    <div class="gateway-grid">
+      {{range .Gateways}}
+      <article class="gateway-card">
+        <header class="flex-row">
+          <div><strong>{{.Name}}</strong><div><small><code>{{.Interface}}</code> · {{.Endpoint}}</small></div></div>
+          {{if .Running}}<span class="status-dot status-up" title="Online"></span>{{else}}<span class="status-dot status-down" title="Offline"></span>{{end}}
+        </header>
+        <div class="system-metrics">
+          <span>Handshake: <strong>{{.Handshake}}</strong></span>
+          <span>RX: <strong>{{.TransferRX}}</strong></span>
+          <span>TX: <strong>{{.TransferTX}}</strong></span>
+          <span>Routing: <strong>{{.RoutingTableID}}</strong></span>
+        </div>
+        {{if .LastError}}<div class="toast toast-error">{{.LastError}}</div>{{end}}
+      </article>
+      {{end}}
+    </div>
+    {{else}}<p class="text-muted">Keine VPN-Gateways konfiguriert.</p>{{end}}
+  </section>
 
-	<section class="config-section">
-		<h3>Peer → Gateway Routing</h3>
-		{{if Peers}}
-		<div class="table-responsive">
-			<table role="grid">
-				<thead><tr><th>Peer</th><th>Adresse</th><th>Gateway</th><th>Status</th><th>Letzter Handshake</th><th>Traffic</th></tr></thead>
-				<tbody>
-				{{#each Peers}}
-					<tr>
-						<td><strong>{{Name}}</strong></td>
-						<td><code>{{Address}}</code></td>
-						<td>{{Gateway}}</td>
-						<td>{{if Enabled}}<span class="badge badge-ok">Aktiv</span>{{else}}<span class="badge badge-via">Deaktiviert</span>{{/if}}</td>
-						<td>{{LastSeen}}</td>
-						<td>{{TransferRX}} ↓ / {{TransferTX}} ↑</td>
-					</tr>
-				{{/each}}
-				</tbody>
-			</table>
-		</div>
-		{{else}}<p class="text-muted">Keine Peers vorhanden.</p>{{/if}}
-	</section>
+  <section class="config-section">
+    <h3>Peer → Gateway Routing</h3>
+    {{if .Peers}}
+    <div class="table-responsive">
+      <table role="grid">
+        <thead><tr><th>Peer</th><th>Adresse</th><th>Gateway</th><th>Status</th><th>Letzter Handshake</th><th>Traffic</th></tr></thead>
+        <tbody>
+        {{range .Peers}}
+          <tr>
+            <td><strong>{{.Name}}</strong></td>
+            <td><code>{{.Address}}</code></td>
+            <td>{{.Gateway}}</td>
+            <td>{{if .Enabled}}<span class="badge badge-ok">Aktiv</span>{{else}}<span class="badge badge-via">Deaktiviert</span>{{end}}</td>
+            <td>{{.LastSeen}}</td>
+            <td>{{.TransferRX}} ↓ / {{.TransferTX}} ↑</td>
+          </tr>
+        {{end}}
+        </tbody>
+      </table>
+    </div>
+    {{else}}<p class="text-muted">Keine Peers vorhanden.</p>{{end}}
+  </section>
 
-	<section class="config-section">
-		<h3>Policy Routing</h3>
-		<details>
-			<summary><strong>ip rule</strong></summary>
-			<pre class="diagnostic-output">{{IPRules}}</pre>
-		</details>
-		<details>
-			<summary><strong>VPN-Gateway Routing Tables</strong></summary>
-			<pre class="diagnostic-output">{{Routes}}</pre>
-		</details>
-	</section>
+  <section class="config-section">
+    <h3>Policy Routing</h3>
+    <details><summary><strong>ip rule</strong></summary><pre class="diagnostic-output">{{.IPRules}}</pre></details>
+    <details><summary><strong>VPN-Gateway Routing Tables</strong></summary><pre class="diagnostic-output">{{.Routes}}</pre></details>
+  </section>
 
-	<section class="config-section">
-		<h3>Audit-Log</h3>
-		<pre class="diagnostic-output">{{AuditLog}}</pre>
-	</section>
+  <section class="config-section">
+    <h3>Audit-Log</h3>
+    <pre class="diagnostic-output">{{.AuditLog}}</pre>
+  </section>
 
-	<section class="config-section">
-		<h3>Diagnose</h3>
-		<p class="text-muted">Diese Ansicht enthält bewusst keine privaten WireGuard-Schlüssel oder Preshared Keys.</p>
-		<button class="btn btn-outline secondary" onclick="copyText(document.getElementById('diagnostic-summary').innerText, this)">Diagnose kopieren</button>
-		<pre id="diagnostic-summary" class="diagnostic-output">wg-busy {{Version}}
-Platform: {{OS}}/{{Arch}}
-WireGuard: {{if WireGuardUp}}UP{{else}}DOWN{{/if}}
-Peers: {{ActivePeers}}/{{PeerCount}}
-Gateways: {{RunningGateways}}/{{GatewayCount}}
-IPv6 gateways: {{IPv6Gateways}}
+  <section class="config-section">
+    <h3>Diagnose</h3>
+    <p class="text-muted">Diese Ansicht enthält bewusst keine privaten WireGuard-Schlüssel oder Preshared Keys.</p>
+    <button class="btn btn-outline secondary" onclick="copyText(document.getElementById('diagnostic-summary').innerText, this)">Diagnose kopieren</button>
+    <pre id="diagnostic-summary" class="diagnostic-output">wg-busy {{.Version}}
+Platform: {{.OS}}/{{.Arch}}
+WireGuard: {{if .WireGuardUp}}UP{{else}}DOWN{{end}}
+Peers: {{.ActivePeers}}/{{.PeerCount}}
+Gateways: {{.RunningGateways}}/{{.GatewayCount}}
+IPv6 gateways: {{.IPv6Gateways}}
 
-{{IPRules}}
+{{.IPRules}}
 
-{{Routes}}</pre>
-	</section>
+{{.Routes}}</pre>
+  </section>
 </div>
 `))
 
