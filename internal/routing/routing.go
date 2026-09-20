@@ -398,6 +398,161 @@ func policyRouteCmd(action, subnet, gateway string, table uint, gateways []model
 
 // enabledExitNodes returns the exit nodes traffic can currently be steered to,
 // keyed by peer ID.
+const (
+	gatewayRulePriorityBase = 18000
+	gatewayChainV4            = "WG_BUSY_GW_FWD4"
+	gatewayChainV6            = "WG_BUSY_GW_FWD6"
+	gatewayNatChainV4         = "WG_BUSY_GW_NAT4"
+)
+
+// vpnGatewayRule describes source-based policy routing for a peer assigned
+// directly to an imported WireGuard gateway. A trailing prohibit rule makes the
+// assignment fail closed if the gateway table has no usable route.
+type vpnGatewayRule struct {
+	IPCommand string
+	Source    string
+	Table     uint
+	Priority  int
+}
+
+// gatewayInterfaces returns only configured gateway interfaces.
+func gatewayInterfaces(cfg models.AppConfig) map[string]models.VPNGateway {
+	result := make(map[string]models.VPNGateway, len(cfg.VPNGateways))
+	for _, g := range cfg.VPNGateways {
+		if g.Interface == "" {
+			continue
+		}
+		result[g.ID] = g
+	}
+	return result
+}
+
+// vpnGatewayRules returns source rules for every enabled peer assigned to an
+// enabled gateway. The lookup rule precedes a prohibit rule, so missing routes
+// can never fall through into the main routing table.
+func vpnGatewayRules(cfg models.AppConfig) []vpnGatewayRule {
+	gateways := gatewayInterfaces(cfg)
+	var rules []vpnGatewayRule
+	priority := gatewayRulePriorityBase
+	for _, p := range cfg.Peers {
+		if !p.Enabled || strings.TrimSpace(p.VPNGatewayID) == "" {
+			continue
+		}
+		g, ok := gateways[p.VPNGatewayID]
+		if !ok || !g.Enabled || g.RoutingTableID == 0 {
+			continue
+		}
+		for _, source := range models.PeerSources(p.AllowedIPs) {
+			cmd := "ip"
+			if strings.Contains(source, ":") {
+				cmd = "ip -6"
+			}
+			rules = append(rules,
+				vpnGatewayRule{IPCommand: cmd, Source: source, Table: g.RoutingTableID, Priority: priority},
+				vpnGatewayRule{IPCommand: cmd, Source: source, Table: 0, Priority: priority + 1},
+			)
+			priority += 2
+		}
+	}
+	return rules
+}
+
+// gatewayRouteCommands creates or removes a default route (or IPv6 default
+// route) in each gateway's dedicated policy table. Table=off is used in the
+// imported wg-quick config so these routes never become the host's main route.
+func gatewayRouteCommands(cfg models.AppConfig, action string) []string {
+	var cmds []string
+	for _, g := range cfg.VPNGateways {
+		if g.Interface == "" || g.RoutingTableID == 0 {
+			continue
+		}
+		hasV4, hasV6 := false, false
+		for _, allowed := range strings.Split(g.AllowedIPs, ",") {
+			_, n, err := net.ParseCIDR(strings.TrimSpace(allowed))
+			if err != nil {
+				continue
+			}
+			if n.IP.To4() != nil {
+				if n.String() == "0.0.0.0/0" {
+					hasV4 = true
+				}
+			} else if n.String() == "::/0" {
+				hasV6 = true
+			}
+		}
+		if hasV4 {
+			cmd := fmt.Sprintf("ip route %s default dev %s table %d", action, g.Interface, g.RoutingTableID)
+			if action == "del" {
+				cmd += " 2>/dev/null || true"
+			}
+			cmds = append(cmds, cmd)
+		}
+		if hasV6 {
+			cmd := fmt.Sprintf("ip -6 route %s default dev %s table %d", action, g.Interface, g.RoutingTableID)
+			if action == "del" {
+				cmd += " 2>/dev/null || true"
+			}
+			cmds = append(cmds, cmd)
+		}
+	}
+	return cmds
+}
+
+func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
+	var cmds []string
+	if add {
+		cmds = append(cmds,
+			fmt.Sprintf("iptables -w -N %s 2>/dev/null || true", gatewayChainV4),
+			fmt.Sprintf("iptables -w -F %s", gatewayChainV4),
+			fmt.Sprintf("iptables -w -C FORWARD -i %s -j %s 2>/dev/null || iptables -w -I FORWARD 1 -i %s -j %s", models.WGDevice, gatewayChainV4, models.WGDevice, gatewayChainV4),
+			fmt.Sprintf("iptables -w -N %s 2>/dev/null || true", gatewayNatChainV4),
+			fmt.Sprintf("iptables -w -F %s", gatewayNatChainV4),
+			fmt.Sprintf("iptables -w -C POSTROUTING -j %s 2>/dev/null || iptables -w -I POSTROUTING 1 -j %s", gatewayNatChainV4, gatewayNatChainV4),
+			fmt.Sprintf("ip6tables -w -N %s 2>/dev/null || true", gatewayChainV6),
+			fmt.Sprintf("ip6tables -w -F %s", gatewayChainV6),
+			fmt.Sprintf("ip6tables -w -C FORWARD -i %s -j %s 2>/dev/null || ip6tables -w -I FORWARD 1 -i %s -j %s", models.WGDevice, gatewayChainV6, models.WGDevice, gatewayChainV6),
+		)
+
+		gateways := gatewayInterfaces(cfg)
+		for _, p := range cfg.Peers {
+			if !p.Enabled || p.VPNGatewayID == "" {
+				continue
+			}
+			g, ok := gateways[p.VPNGatewayID]
+			if !ok || !g.Enabled || g.Interface == "" {
+				continue
+			}
+			for _, source := range models.PeerSources(p.AllowedIPs) {
+				if strings.Contains(source, ":") {
+					cmds = append(cmds,
+						fmt.Sprintf("ip6tables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV6, source, g.Interface),
+						fmt.Sprintf("ip6tables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV6, source, models.WGDevice),
+					)
+				} else {
+					cmds = append(cmds,
+						fmt.Sprintf("iptables -w -A %s -s %s -o %s -j ACCEPT", gatewayChainV4, source, g.Interface),
+						fmt.Sprintf("iptables -w -A %s -s %s -o %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, source, models.WGDevice),
+						fmt.Sprintf("iptables -w -A %s -s %s -o %s -j MASQUERADE", gatewayNatChainV4, source, g.Interface),
+					)
+				}
+			}
+		}
+		return cmds
+	}
+
+	return []string{
+		fmt.Sprintf("iptables -w -D FORWARD -i %s -j %s 2>/dev/null || true", models.WGDevice, gatewayChainV4),
+		fmt.Sprintf("iptables -w -F %s 2>/dev/null || true", gatewayChainV4),
+		fmt.Sprintf("iptables -w -X %s 2>/dev/null || true", gatewayChainV4),
+		fmt.Sprintf("iptables -w -D POSTROUTING -j %s 2>/dev/null || true", gatewayNatChainV4),
+		fmt.Sprintf("iptables -w -F %s 2>/dev/null || true", gatewayNatChainV4),
+		fmt.Sprintf("iptables -w -X %s 2>/dev/null || true", gatewayNatChainV4),
+		fmt.Sprintf("ip6tables -w -D FORWARD -i %s -j %s 2>/dev/null || true", models.WGDevice, gatewayChainV6),
+		fmt.Sprintf("ip6tables -w -F %s 2>/dev/null || true", gatewayChainV6),
+		fmt.Sprintf("ip6tables -w -X %s 2>/dev/null || true", gatewayChainV6),
+	}
+}
+
 func enabledExitNodes(cfg models.AppConfig) map[string]models.Peer {
 	exitNodes := make(map[string]models.Peer)
 	for _, p := range cfg.Peers {
@@ -488,6 +643,8 @@ func generatePostUpCommands(cfg models.AppConfig, gateways []models.GatewayNet, 
 	// No early return when there are no exit nodes: custom policy routes are
 	// independent of them and must still be emitted.
 	cmds := exitNodeRouteCmds("replace", exitNodes)
+	cmds = append(cmds, gatewayRouteCommands(cfg, "replace")...)
+	cmds = append(cmds, gatewayFirewallCommands(cfg, true)...)
 
 	// NAT for anything leaving over ZeroTier.
 	cmds = append(cmds, zeroTierMasquerade(cfg, gateways, advertisedByPeer, true)...)
@@ -546,6 +703,15 @@ func Reconcile(previous models.AppConfig, previousGateways []models.GatewayNet, 
 	for _, r := range peerRules(previous, previousExitNodes) {
 		teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del %s %s priority %d || true", r.IPCommand, r.Selector, r.Action, r.Priority))
 	}
+	teardownCmds = append(teardownCmds, gatewayFirewallCommands(previous, false)...)
+	for _, r := range vpnGatewayRules(previous) {
+		if r.Table == 0 {
+			teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s prohibit priority %d || true", r.IPCommand, r.Source, r.Priority))
+		} else {
+			teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s table %d priority %d || true", r.IPCommand, r.Source, r.Table, r.Priority))
+		}
+	}
+	teardownCmds = append(teardownCmds, gatewayRouteCommands(previous, "del")...)
 	teardownCmds = append(teardownCmds, exitNodeRouteCmds("del", previousExitNodes)...)
 	teardownCmds = append(teardownCmds, policyRouteCmds("del", previous, previousGateways)...)
 	if err := applyCommands(teardownCmds); err != nil {
@@ -561,7 +727,16 @@ func Reconcile(previous models.AppConfig, previousGateways []models.GatewayNet, 
 	nextExitNodes := enabledExitNodes(next)
 	var setupCmds []string
 	setupCmds = append(setupCmds, exitNodeRouteCmds("replace", nextExitNodes)...)
+	setupCmds = append(setupCmds, gatewayRouteCommands(next, "replace")...)
+	setupCmds = append(setupCmds, gatewayFirewallCommands(next, true)...)
 	setupCmds = append(setupCmds, zeroTierMasquerade(next, nextGateways, nextAdvertised, true)...)
+	for _, r := range vpnGatewayRules(next) {
+		if r.Table == 0 {
+			setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s prohibit priority %d", r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
+		} else {
+			setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s table %d priority %d", r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Table, r.Priority))
+		}
+	}
 	for _, r := range peerRules(next, nextExitNodes) {
 		setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add %s %s priority %d",
 			r.IPCommand, r.Priority, r.IPCommand, r.Selector, r.Action, r.Priority))
