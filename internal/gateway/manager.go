@@ -65,7 +65,7 @@ func ParseConfig(raw string) (models.VPNGateway, error) {
 	section := ""
 	peers := 0
 	scan := func(s string) error {
-		s = strings.TrimSpace(strings.TrimSuffix(s, ""))
+		s = strings.TrimSpace(strings.TrimSuffix(s, "\r"))
 		if s == "" || strings.HasPrefix(s, "#") || strings.HasPrefix(s, ";") {
 			return nil
 		}
@@ -137,8 +137,7 @@ func ParseConfig(raw string) (models.VPNGateway, error) {
 		return nil
 	}
 
-	lines := strings.Split(raw, "
-")
+	lines := strings.Split(raw, "\n")
 	for _, line := range lines {
 		if err := scan(line); err != nil {
 			return models.VPNGateway{}, err
@@ -206,34 +205,22 @@ func (m *Manager) Render(g models.VPNGateway) (string, error) {
 	// Table=off prevents an imported full-tunnel config from replacing the
 	// Unraid container's main default route.
 	var b strings.Builder
-	b.WriteString("[Interface]
-")
-	b.WriteString("PrivateKey = " + g.PrivateKey + "
-")
-	b.WriteString("Address = " + g.Address + "
-")
+	b.WriteString("[Interface]\n")
+	b.WriteString("PrivateKey = " + g.PrivateKey + "\n")
+	b.WriteString("Address = " + g.Address + "\n")
 	if g.MTU != 0 {
-		b.WriteString("MTU = " + strconv.Itoa(int(g.MTU)) + "
-")
+		b.WriteString("MTU = " + strconv.Itoa(int(g.MTU)) + "\n")
 	}
-	b.WriteString("Table = off
-
-")
-	b.WriteString("[Peer]
-")
-	b.WriteString("PublicKey = " + g.PublicKey + "
-")
+	b.WriteString("Table = off\n\n")
+	b.WriteString("[Peer]\n")
+	b.WriteString("PublicKey = " + g.PublicKey + "\n")
 	if g.PresharedKey != "" {
-		b.WriteString("PresharedKey = " + g.PresharedKey + "
-")
+		b.WriteString("PresharedKey = " + g.PresharedKey + "\n")
 	}
-	b.WriteString("AllowedIPs = " + g.AllowedIPs + "
-")
-	b.WriteString("Endpoint = " + g.Endpoint + "
-")
+	b.WriteString("AllowedIPs = " + g.AllowedIPs + "\n")
+	b.WriteString("Endpoint = " + g.Endpoint + "\n")
 	if g.PersistentKeepalive != 0 {
-		b.WriteString("PersistentKeepalive = " + strconv.Itoa(int(g.PersistentKeepalive)) + "
-")
+		b.WriteString("PersistentKeepalive = " + strconv.Itoa(int(g.PersistentKeepalive)) + "\n")
 	}
 	return b.String(), nil
 }
