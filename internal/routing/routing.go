@@ -839,8 +839,11 @@ func generatePostUpCommands(cfg models.AppConfig, gateways []models.GatewayNet, 
 	// These are deliberately after LAN bypass rules so local networks stay on
 	// the normal path, and before the main table (32766) so internet traffic
 	// follows the selected gateway. The trailing prohibit rule prevents fallback.
-	for _, r := range vpnGatewayRules(cfg) {
-		if r.Table == 0 {
+	for _, r := range append(vpnGatewayRules(cfg), peerDeviceGatewayRules(cfg)...) {
+		if r.Direct {
+			cmds = append(cmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s table main priority %d",
+				r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
+		} else if r.Table == 0 {
 			cmds = append(cmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s prohibit priority %d",
 				r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
 		} else {
@@ -989,8 +992,10 @@ func generatePostDownCommands(cfg models.AppConfig, gateways []models.GatewayNet
 	}
 
 	// Remove source-based VPN gateway rules first.
-	for _, r := range vpnGatewayRules(cfg) {
-		if r.Table == 0 {
+	for _, r := range append(vpnGatewayRules(cfg), peerDeviceGatewayRules(cfg)...) {
+		if r.Direct {
+			cmds = append(cmds, fmt.Sprintf("%s rule del from %s table main priority %d || true", r.IPCommand, r.Source, r.Priority))
+		} else if r.Table == 0 {
 			cmds = append(cmds, fmt.Sprintf("%s rule del from %s prohibit priority %d || true", r.IPCommand, r.Source, r.Priority))
 		} else {
 			cmds = append(cmds, fmt.Sprintf("%s rule del from %s table %d priority %d || true", r.IPCommand, r.Source, r.Table, r.Priority))
