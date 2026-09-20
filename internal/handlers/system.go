@@ -63,7 +63,7 @@ type systemPageData struct {
 	Routes        string
 }
 
-var systemPageTmpl = template.Must(template.New("system").Parse(`
+var systemPageTmpl = template.Must(template.New("system").Funcs(template.FuncMap{"ifClass": ifClass}).Parse(`
 <div id="system-page">
 	<div class="header-row">
 		<div>
