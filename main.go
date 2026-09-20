@@ -89,7 +89,12 @@ func main() {
 	store.OnChange(zt.Configure)
 	store.OnChange(func(cfg *models.AppConfig) {
 		snapshot := cfg.Clone()
-		go gatewayManager.Reconcile(snapshot)
+		go func() {
+			gatewayManager.Reconcile(snapshot)
+			if err := store.ReapplyRouting(); err != nil {
+				log.Printf("applying routing after VPN gateway change: %v", err)
+			}
+		}()
 	})
 	// Policy routes may use a ZeroTier peer IP as their gateway, so wg0.conf
 	// rendering needs to know which subnets are on-link over which zt device.
@@ -118,6 +123,9 @@ func main() {
 		zt.Configure(cfg)
 		gatewayManager.Reconcile(*cfg)
 	})
+	if err := store.ReapplyRouting(); err != nil {
+		log.Printf("applying initial VPN gateway routing: %v", err)
+	}
 	zt.Start()
 
 	// Start stats collector with persisted base traffic counters.
