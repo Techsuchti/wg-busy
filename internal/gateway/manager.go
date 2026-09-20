@@ -238,6 +238,39 @@ func ensurePolicyRoutes(g models.VPNGateway) error {
 		return nil
 	}
 
+	// Keep the upstream WireGuard endpoint reachable through the host's normal
+	// uplink. The selected peer traffic is policy-routed through the gateway,
+	// but the encrypted gateway transport itself must never recurse into the
+	// gateway tunnel.
+	host, _, err := net.SplitHostPort(strings.TrimSpace(g.Endpoint))
+	if err == nil {
+		if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+			out, routeErr := command("ip", "-4", "route", "get", ip.String())
+			if ip.To4() != nil && routeErr == nil {
+				fields := strings.Fields(string(out))
+				dev, via := "", ""
+				for i := 0; i < len(fields); i++ {
+					if fields[i] == "dev" && i+1 < len(fields) {
+						dev = fields[i+1]
+					}
+					if fields[i] == "via" && i+1 < len(fields) {
+						via = fields[i+1]
+					}
+				}
+				if dev != "" && dev != g.Interface {
+					args := []string{"route", "replace", ip.String() + "/32"}
+					if via != "" {
+						args = append(args, "via", via)
+					}
+					args = append(args, "dev", dev)
+					if out, err := command("ip", args...); err != nil {
+						return fmt.Errorf("installing gateway endpoint route for %s: %s: %w", g.Name, strings.TrimSpace(string(out)), err)
+					}
+				}
+			}
+		}
+	}
+
 	for _, allowed := range strings.Split(g.AllowedIPs, ",") {
 		allowed = strings.TrimSpace(allowed)
 		_, network, err := net.ParseCIDR(allowed)
