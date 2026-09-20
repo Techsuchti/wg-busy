@@ -3,6 +3,7 @@ package routing
 import (
 	"fmt"
 	"net"
+	"os"
 	"os/exec"
 	"sort"
 	"strings"
@@ -516,7 +517,31 @@ func gatewayFirewallCommands(cfg models.AppConfig, add bool) []string {
 			fmt.Sprintf("ip6tables -w -C FORWARD -i %s -j %s 2>/dev/null || ip6tables -w -I FORWARD 1 -i %s -j %s", models.WGDevice, gatewayChainV6, models.WGDevice, gatewayChainV6),
 		)
 
-		gateways := gatewayInterfaces(cfg)
+\t\tgateways := gatewayInterfaces(cfg)
+
+		// LAN traffic remains reachable for all WireGuard peers, including peers
+		// assigned to a VPN gateway. MASQUERADE gives LAN hosts a return path.
+		for _, p := range cfg.Peers {
+			if !p.Enabled {
+				continue
+			}
+			for _, source := range models.PeerSources(p.AllowedIPs) {
+				if strings.Contains(source, ":") {
+					continue
+				}
+				for _, dest := range localNetworkCIDRs() {
+					if strings.Contains(dest, ":") {
+						continue
+					}
+					cmds = append(cmds,
+						fmt.Sprintf("iptables -w -A %s -s %s -d %s -j ACCEPT", gatewayChainV4, source, dest),
+						fmt.Sprintf("iptables -t nat -w -A %s -s %s -d %s -j MASQUERADE", gatewayNatChainV4, source, dest),
+						fmt.Sprintf("iptables -w -A %s -d %s -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT", gatewayChainV4, dest),
+					)
+				}
+			}
+		}
+
 		for _, p := range cfg.Peers {
 			if !p.Enabled || p.VPNGatewayID == "" {
 				continue
@@ -655,6 +680,12 @@ func generatePostUpCommands(cfg models.AppConfig, gateways []models.GatewayNet, 
 	// Strict egress firewall chains and rules.
 	cmds = append(cmds, strictFirewallCommands(cfg, gateways, true)...)
 
+\t// LAN destinations bypass source-based VPN gateway routing and use the main table.
+	for _, r := range localNetworkRules(cfg) {
+		cmds = append(cmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s to %s table main priority %d",
+			r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Dest, r.Priority))
+	}
+
 	// Policy rules for exit nodes, policy routes, and strict rejects.
 	//
 	// Each add is preceded by a delete of whatever holds that priority: `ip rule
@@ -707,6 +738,9 @@ func Reconcile(previous models.AppConfig, previousGateways []models.GatewayNet, 
 		teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del %s %s priority %d || true", r.IPCommand, r.Selector, r.Action, r.Priority))
 	}
 	teardownCmds = append(teardownCmds, gatewayFirewallCommands(previous, false)...)
+\tfor _, r := range localNetworkRules(previous) {
+		teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s to %s table main priority %d || true", r.IPCommand, r.Source, r.Dest, r.Priority))
+	}
 	for _, r := range vpnGatewayRules(previous) {
 		if r.Table == 0 {
 			teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s prohibit priority %d || true", r.IPCommand, r.Source, r.Priority))
@@ -732,7 +766,11 @@ func Reconcile(previous models.AppConfig, previousGateways []models.GatewayNet, 
 	setupCmds = append(setupCmds, exitNodeRouteCmds("replace", nextExitNodes)...)
 	setupCmds = append(setupCmds, gatewayRouteCommands(next, "replace")...)
 	setupCmds = append(setupCmds, gatewayFirewallCommands(next, true)...)
-	setupCmds = append(setupCmds, zeroTierMasquerade(next, nextGateways, nextAdvertised, true)...)
+\tsetupCmds = append(setupCmds, zeroTierMasquerade(next, nextGateways, nextAdvertised, true)...)
+	for _, r := range localNetworkRules(next) {
+		setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s to %s table main priority %d",
+			r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Dest, r.Priority))
+	}
 	for _, r := range vpnGatewayRules(next) {
 		if r.Table == 0 {
 			setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s prohibit priority %d", r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
@@ -777,6 +815,11 @@ func generatePostDownCommands(cfg models.AppConfig, gateways []models.GatewayNet
 	// No early return when there are no exit nodes: custom policy routes are
 	// independent of them and must still be emitted.
 	cmds := zeroTierMasquerade(cfg, gateways, advertisedByPeer, false)
+
+\t// Remove LAN bypass rules first.
+	for _, r := range localNetworkRules(cfg) {
+		cmds = append(cmds, fmt.Sprintf("%s rule del from %s to %s table main priority %d || true", r.IPCommand, r.Source, r.Dest, r.Priority))
+	}
 
 	// Remove policy rules first. Deleting by priority is exact, so repeated
 	// apply cycles cannot leave duplicates behind.
