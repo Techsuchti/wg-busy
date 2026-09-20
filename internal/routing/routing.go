@@ -481,6 +481,7 @@ type vpnGatewayRule struct {
 	Source    string
 	Table     uint
 	Priority  int
+	Direct    bool
 }
 
 // gatewayInterfaces returns only configured gateway interfaces.
@@ -518,6 +519,52 @@ func vpnGatewayRules(cfg models.AppConfig) []vpnGatewayRule {
 			rules = append(rules,
 				vpnGatewayRule{IPCommand: cmd, Source: source, Table: g.RoutingTableID, Priority: priority},
 				vpnGatewayRule{IPCommand: cmd, Source: source, Table: 0, Priority: priority + 1},
+			)
+			priority += 2
+		}
+	}
+	return rules
+}
+
+const deviceGatewayRulePriorityBase = 16000
+
+// peerDeviceGatewayRules returns source rules for LAN devices behind peers.
+// Device-specific rules are evaluated before the peer-wide VPN gateway rule.
+// An empty GatewayID means explicit direct routing via the main table.
+func peerDeviceGatewayRules(cfg models.AppConfig) []vpnGatewayRule {
+	gateways := gatewayInterfaces(cfg)
+	var rules []vpnGatewayRule
+	priority := deviceGatewayRulePriorityBase
+	for _, p := range cfg.Peers {
+		if !p.Enabled {
+			continue
+		}
+		for _, device := range p.DeviceRoutingRules {
+			if !device.Enabled || net.ParseIP(strings.TrimSpace(device.DeviceIP)) == nil {
+				continue
+			}
+			ip := net.ParseIP(strings.TrimSpace(device.DeviceIP))
+			if ip.To4() == nil {
+				continue
+			}
+			if strings.TrimSpace(device.GatewayID) == "" {
+				rules = append(rules, vpnGatewayRule{IPCommand: "ip", Source: ip.String(), Direct: true, Priority: priority})
+				priority++
+				continue
+			}
+			g, ok := gateways[device.GatewayID]
+			if !ok || !g.Enabled || g.RoutingTableID == 0 {
+				// Invalid assignment fails closed instead of falling through to the
+				// peer-wide gateway or the host main table.
+				rules = append(rules,
+					vpnGatewayRule{IPCommand: "ip", Source: ip.String(), Table: 0, Priority: priority},
+				)
+				priority++
+				continue
+			}
+			rules = append(rules,
+				vpnGatewayRule{IPCommand: "ip", Source: ip.String(), Table: g.RoutingTableID, Priority: priority},
+				vpnGatewayRule{IPCommand: "ip", Source: ip.String(), Table: 0, Priority: priority + 1},
 			)
 			priority += 2
 		}
@@ -825,8 +872,10 @@ func Reconcile(previous models.AppConfig, previousGateways []models.GatewayNet, 
 	for _, r := range localNetworkRules(previous) {
 		teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s to %s table main priority %d || true", r.IPCommand, r.Source, r.Dest, r.Priority))
 	}
-	for _, r := range vpnGatewayRules(previous) {
-		if r.Table == 0 {
+	for _, r := range append(vpnGatewayRules(previous), peerDeviceGatewayRules(previous)...) {
+		if r.Direct {
+			teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s table main priority %d || true", r.IPCommand, r.Source, r.Priority))
+		} else if r.Table == 0 {
 			teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s prohibit priority %d || true", r.IPCommand, r.Source, r.Priority))
 		} else {
 			teardownCmds = append(teardownCmds, fmt.Sprintf("%s rule del from %s table %d priority %d || true", r.IPCommand, r.Source, r.Table, r.Priority))
@@ -855,8 +904,10 @@ func Reconcile(previous models.AppConfig, previousGateways []models.GatewayNet, 
 		setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s to %s table main priority %d",
 			r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Dest, r.Priority))
 	}
-	for _, r := range vpnGatewayRules(next) {
-		if r.Table == 0 {
+	for _, r := range append(vpnGatewayRules(next), peerDeviceGatewayRules(next)...) {
+		if r.Direct {
+			setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s table main priority %d", r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
+		} else if r.Table == 0 {
 			setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s prohibit priority %d", r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Priority))
 		} else {
 			setupCmds = append(setupCmds, fmt.Sprintf("%s rule del priority %d 2>/dev/null || true; %s rule add from %s table %d priority %d", r.IPCommand, r.Priority, r.IPCommand, r.Source, r.Table, r.Priority))
