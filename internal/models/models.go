@@ -38,6 +38,8 @@ func (c AppConfig) Clone() AppConfig {
 	clone.Server.Passkeys = append([]Passkey(nil), c.Server.Passkeys...)
 	clone.Peers = append([]Peer(nil), c.Peers...)
 	for i := range clone.Peers {
+		clone.Peers[i].NetworkDevices = append([]PeerNetworkDevice(nil), c.Peers[i].NetworkDevices...)
+		clone.Peers[i].DeviceRoutingRules = append([]PeerDeviceRoutingRule(nil), c.Peers[i].DeviceRoutingRules...)
 		clone.Peers[i].ExitNodeRoutes = append([]string(nil), c.Peers[i].ExitNodeRoutes...)
 		clone.Peers[i].AdvertisedRoutes = append([]string(nil), c.Peers[i].AdvertisedRoutes...)
 		clone.Peers[i].PolicyRoutes = append([]string(nil), c.Peers[i].PolicyRoutes...)
@@ -270,6 +272,25 @@ func validateRouteFilters(filters []RouteFilter, fieldPrefix string) ValidationE
 	return errs
 }
 
+// PeerNetworkDevice is a LAN device discovered behind a WireGuard peer.
+type PeerNetworkDevice struct {
+	IP string `yaml:"ip"`
+	MAC string `yaml:"mac,omitempty"`
+	Hostname string `yaml:"hostname,omitempty"`
+	Vendor string `yaml:"vendor,omitempty"`
+	Interface string `yaml:"interface,omitempty"`
+	Online bool `yaml:"online"`
+	LastSeen time.Time `yaml:"lastSeen,omitempty"`
+}
+
+// PeerDeviceRoutingRule assigns one discovered LAN device to a VPN gateway.
+// An empty GatewayID means direct routing through the normal host connection.
+type PeerDeviceRoutingRule struct {
+	DeviceIP string `yaml:"deviceIP"`
+	GatewayID string `yaml:"gatewayID,omitempty"`
+	Enabled bool `yaml:"enabled"`
+}
+
 // Peer represents a WireGuard peer (client).
 type Peer struct {
 	ID                   string   `yaml:"id"`
@@ -292,6 +313,8 @@ type Peer struct {
 	RoutingTableID       uint     `yaml:"routingTableID,omitempty"`
 	PolicyRoutingTableID uint     `yaml:"policyRoutingTableID,omitempty"`
 	VPNGatewayID         string   `yaml:"vpnGatewayID,omitempty"`
+	NetworkDevices       []PeerNetworkDevice     `yaml:"networkDevices,omitempty"`
+	DeviceRoutingRules   []PeerDeviceRoutingRule `yaml:"deviceRoutingRules,omitempty"`
 	Enabled              bool     `yaml:"enabled"`
 
 	CreatedAt  time.Time `yaml:"createdAt"`
