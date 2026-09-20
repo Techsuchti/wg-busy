@@ -8,7 +8,6 @@ on:
       - '**.md'
       - '**.jpg'
       - '**.png'
-      - '.github/**'
       - 'docs/**'
   pull_request:
     branches: ["master"]
